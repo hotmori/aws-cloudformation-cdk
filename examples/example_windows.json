@@ -1,0 +1,326 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Sample template that sets up and configures CloudWatch logs on Windows 2012R2 instance instance.",
+    "Parameters": {
+        "KeyPair": {
+            "Description": "Name of an existing EC2 KeyPair to enable RDP access to the instances",
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "ConstraintDescription": "must be the name of an existing EC2 KeyPair."
+        },
+        "RDPLocation": {
+            "Description": "The IP address range that can be used to RDP to the EC2 instances",
+            "Type": "String",
+            "MinLength": "9",
+            "MaxLength": "18",
+            "Default": "0.0.0.0/0",
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+            "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
+        },
+        "OperatorEmail": {
+            "Description": "Email address to notify if there are any scaling operations",
+            "Type": "String"
+        }
+    },
+    "Mappings": {
+        "AWSAMIRegionMap": {
+            "ap-northeast-1": {
+                "WS2012R2": "ami-09e7006451ad8bf4d"
+            },
+            "ap-northeast-2": {
+                "WS2012R2": "ami-0754980e4d02153f9"
+            },
+            "ap-south-1": {
+                "WS2012R2": "ami-00ad91b37d56c1d08"
+            },
+            "ap-southeast-1": {
+                "WS2012R2": "ami-09e7006451ad8bf4d"
+            },
+            "ap-southeast-2": {
+                "WS2012R2": "ami-000d23d3067008aea"
+            },
+            "ca-central-1": {
+                "WS2012R2": "ami-0d8e70862465b9da0"
+            },
+            "eu-central-1": {
+                "WS2012R2": "ami-0c0f322f5676ba254"
+            },
+            "eu-west-1": {
+                "WS2012R2": "ami-0a46adf18f8875ad6"
+            },
+            "eu-west-2": {
+                "WS2012R2": "ami-0651428174d9438e9"
+            },
+            "sa-east-1": {
+                "WS2012R2": "ami-08ebd138109a6c223"
+            },
+            "us-east-1": {
+                "WS2012R2": "ami-0ef6fb504535468b2"
+            },
+            "us-east-2": {
+                "WS2012R2": "ami-0f466c6044f510bd3"
+            },
+            "us-west-1": {
+                "WS2012R2": "ami-026f68ef6465e6c09"
+            },
+            "us-west-2": {
+                "WS2012R2": "ami-0274ca53943a86543"
+            }
+        }
+    },
+    "Resources": {
+        "WebServerSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Enable HTTP access via port 80 and RDP access via port 3389",
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "80",
+                        "ToPort": "80",
+                        "CidrIp": "0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "3389",
+                        "ToPort": "3389",
+                        "CidrIp": {
+                            "Ref": "RDPLocation"
+                        }
+                    }
+                ]
+            }
+        },
+        "LogRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "ec2.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+                ],
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "LogRolePolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "logs:Create*",
+                                        "logs:PutLogEvents",
+                                        "s3:GetObject"
+                                    ],
+                                    "Resource": [
+                                        "arn:aws:logs:*:*:*",
+                                        "arn:aws:s3:::*"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "LogRoleInstanceProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Path": "/",
+                "Roles": [
+                    {
+                        "Ref": "LogRole"
+                    }
+                ]
+            }
+        },
+        "WebServerHost": {
+            "Type": "AWS::EC2::Instance",
+            "CreationPolicy": {
+                "ResourceSignal": {
+                    "Timeout": "PT15M"
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Init": {
+                    "configSets": {
+                        "config": [
+                            "00-ConfigureCWLogs",
+                            "01-InstallWebServer",
+                            "02-ConfigureApplication",
+                            "03-Finalize"
+                        ]
+                    },
+                    "00-ConfigureCWLogs": {
+                        "files": {
+                            "C:\\Program Files\\Amazon\\SSM\\Plugins\\awsCloudWatch\\AWS.EC2.Windows.CloudWatch.json": {
+                                "content": {
+                                    "Fn::Sub": "{\n  \"EngineConfiguration\": {\n      \"Components\": [\n          {\n              \"FullName\": \"AWS.EC2.Windows.CloudWatch.EventLog.EventLogInputComponent,AWS.EC2.Windows.CloudWatch\",\n              \"Id\": \"ApplicationEventLog\",\n              \"Parameters\": {\n                  \"Levels\": \"7\",\n                  \"LogName\": \"Application\"\n              }\n          },\n          {\n              \"FullName\": \"AWS.EC2.Windows.CloudWatch.EventLog.EventLogInputComponent,AWS.EC2.Windows.CloudWatch\",\n              \"Id\": \"SystemEventLog\",\n              \"Parameters\": {\n                  \"Levels\": \"7\",\n                  \"LogName\": \"System\"\n              }\n          },\n          {\n              \"FullName\": \"AWS.EC2.Windows.CloudWatch.EventLog.EventLogInputComponent,AWS.EC2.Windows.CloudWatch\",\n              \"Id\": \"SecurityEventLog\",\n              \"Parameters\": {\n                  \"Levels\": \"7\",\n                  \"LogName\": \"Security\"\n              }\n          },\n          {\n              \"FullName\": \"AWS.EC2.Windows.CloudWatch.CustomLog.CustomLogInputComponent,AWS.EC2.Windows.CloudWatch\",\n              \"Id\": \"EC2ConfigLog\",\n              \"Parameters\": {\n                  \"CultureName\": \"en-US\",\n                  \"Encoding\": \"ASCII\",\n                  \"Filter\": \"EC2ConfigLog.txt\",\n                  \"LogDirectoryPath\": \"C:\\\\Program Files\\\\Amazon\\\\Ec2ConfigService\\\\Logs\",\n                  \"TimeZoneKind\": \"UTC\",\n                  \"TimestampFormat\": \"yyyy-MM-ddTHH:mm:ss.fffZ:\"\n              }\n          },\n          {\n              \"FullName\": \"AWS.EC2.Windows.CloudWatch.CustomLog.CustomLogInputComponent,AWS.EC2.Windows.CloudWatch\",\n              \"Id\": \"CfnInitLog\",\n              \"Parameters\": {\n                  \"CultureName\": \"en-US\",\n                  \"Encoding\": \"ASCII\",\n                  \"Filter\": \"cfn-init.log\",\n                  \"LogDirectoryPath\": \"C:\\\\cfn\\\\log\",\n                  \"TimeZoneKind\": \"Local\",\n                  \"TimestampFormat\": \"yyyy-MM-dd HH:mm:ss,fff\"\n              }\n          },\n          {\n              \"FullName\": \"AWS.EC2.Windows.CloudWatch.CustomLog.CustomLogInputComponent,AWS.EC2.Windows.CloudWatch\",\n              \"Id\": \"IISLogs\",\n              \"Parameters\": {\n                  \"CultureName\": \"en-US\",\n                  \"Encoding\": \"UTF-8\",\n                  \"Filter\": \"\",\n                  \"LineCount\": \"3\",\n                  \"LogDirectoryPath\": \"C:\\\\inetpub\\\\logs\\\\LogFiles\\\\W3SVC1\",\n                  \"TimeZoneKind\": \"UTC\",\n                  \"TimestampFormat\": \"yyyy-MM-dd HH:mm:ss\"\n              }\n          },\n          {\n              \"FullName\": \"AWS.EC2.Windows.CloudWatch.PerformanceCounterComponent.PerformanceCounterInputComponent,AWS.EC2.Windows.CloudWatch\",\n              \"Id\": \"MemoryPerformanceCounter\",\n              \"Parameters\": {\n                  \"CategoryName\": \"Memory\",\n                  \"CounterName\": \"Available MBytes\",\n                  \"DimensionName\": \"\",\n                  \"DimensionValue\": \"\",\n                  \"InstanceName\": \"\",\n                  \"MetricName\": \"Memory\",\n                  \"Unit\": \"Megabytes\"\n              }\n          },\n          {\n              \"FullName\": \"AWS.EC2.Windows.CloudWatch.CloudWatchLogsOutput,AWS.EC2.Windows.CloudWatch\",\n              \"Id\": \"CloudWatchApplicationEventLog\",\n              \"Parameters\": {\n                  \"AccessKey\": \"\",\n                  \"LogGroup\": \"${LogGroup}\",\n                  \"LogStream\": \"{instance_id}/ApplicationEventLog\",\n                  \"Region\": \"${AWS::Region}\",\n                  \"SecretKey\": \"\"\n              }\n          },\n          {\n              \"FullName\": \"AWS.EC2.Windows.CloudWatch.CloudWatchLogsOutput,AWS.EC2.Windows.CloudWatch\",\n              \"Id\": \"CloudWatchSystemEventLog\",\n              \"Parameters\": {\n                  \"AccessKey\": \"\",\n                  \"LogGroup\": \"${LogGroup}\",\n                  \"LogStream\": \"{instance_id}/SystemEventLog\",\n                  \"Region\": \"${AWS::Region}\",\n                  \"SecretKey\": \"\"\n              }\n          },\n          {\n              \"FullName\": \"AWS.EC2.Windows.CloudWatch.CloudWatchLogsOutput,AWS.EC2.Windows.CloudWatch\",\n              \"Id\": \"CloudWatchSecurityEventLog\",\n              \"Parameters\": {\n                  \"AccessKey\": \"\",\n                  \"LogGroup\": \"${LogGroup}\",\n                  \"LogStream\": \"{instance_id}/SecurityEventLog\",\n                  \"Region\": \"${AWS::Region}\",\n                  \"SecretKey\": \"\"\n              }\n          },\n          {\n              \"FullName\": \"AWS.EC2.Windows.CloudWatch.CloudWatchLogsOutput,AWS.EC2.Windows.CloudWatch\",\n              \"Id\": \"CloudWatchEC2ConfigLog\",\n              \"Parameters\": {\n                  \"AccessKey\": \"\",\n                  \"LogGroup\": \"${LogGroup}\",\n                  \"LogStream\": \"{instance_id}/EC2ConfigLog\",\n                  \"Region\": \"${AWS::Region}\",\n                  \"SecretKey\": \"\"\n              }\n          },\n          {\n              \"FullName\": \"AWS.EC2.Windows.CloudWatch.CloudWatchLogsOutput,AWS.EC2.Windows.CloudWatch\",\n              \"Id\": \"CloudWatchCfnInitLog\",\n              \"Parameters\": {\n                  \"AccessKey\": \"\",\n                  \"LogGroup\": \"${LogGroup}\",\n                  \"LogStream\": \"{instance_id}/CfnInitLog\",\n                  \"Region\": \"${AWS::Region}\",\n                  \"SecretKey\": \"\"\n              }\n          },\n          {\n              \"FullName\": \"AWS.EC2.Windows.CloudWatch.CloudWatchLogsOutput,AWS.EC2.Windows.CloudWatch\",\n              \"Id\": \"CloudWatchIISLogs\",\n              \"Parameters\": {\n                  \"AccessKey\": \"\",\n                  \"LogGroup\": \"${LogGroup}\",\n                  \"LogStream\": \"{instance_id}/IISLogs\",\n                  \"Region\": \"${AWS::Region}\",\n                  \"SecretKey\": \"\"\n              }\n          },\n          {\n              \"FullName\": \"AWS.EC2.Windows.CloudWatch.CloudWatch.CloudWatchOutputComponent,AWS.EC2.Windows.CloudWatch\",\n              \"Id\": \"CloudWatch\",\n              \"Parameters\": {\n                  \"AccessKey\": \"\",\n                  \"NameSpace\": \"Windows/Default\",\n                  \"Region\": \"${AWS::Region}\",\n                  \"SecretKey\": \"\"\n              }\n          }\n      ],\n      \"Flows\": {\n          \"Flows\": [\n              \"ApplicationEventLog,CloudWatchApplicationEventLog\",\n              \"SystemEventLog,CloudWatchSystemEventLog\",\n              \"SecurityEventLog,CloudWatchSecurityEventLog\",\n              \"EC2ConfigLog,CloudWatchEC2ConfigLog\",\n              \"CfnInitLog,CloudWatchCfnInitLog\",\n              \"IISLogs,CloudWatchIISLogs\",\n              \"MemoryPerformanceCounter,CloudWatch\"\n          ]\n      },\n      \"PollInterval\": \"00:00:05\"\n  },\n  \"IsEnabled\": true\n}\n"
+                                }
+                            }
+                        },
+                        "commands": {
+                            "0-enableSSM": {
+                                "command": "powershell.exe -Command \"Set-Service -Name AmazonSSMAgent -StartupType Automatic\" ",
+                                "waitAfterCompletion": "0"
+                            },
+                            "1-restartSSM": {
+                                "command": "powershell.exe -Command \"Restart-Service AmazonSSMAgent \"",
+                                "waitAfterCompletion": "30"
+                            }
+                        }
+                    },
+                    "01-InstallWebServer": {
+                        "commands": {
+                            "01_install_webserver": {
+                                "command": "powershell.exe -Command \"Install-WindowsFeature Web-Server  -IncludeAllSubFeature\"",
+                                "waitAfterCompletion": "0"
+                            }
+                        }
+                    },
+                    "02-ConfigureApplication": {
+                        "files": {
+                            "c:\\Inetpub\\wwwroot\\index.htm": {
+                                "content": "<html> <head> <title>Test Application Page</title> </head> <body> <h1>Congratulations !! Your IIS server is configured.</h1> </body> </html>"
+                            }
+                        }
+                    },
+                    "03-Finalize": {
+                        "commands": {
+                            "00_signal_success": {
+                                "command": {
+                                    "Fn::Sub": "cfn-signal.exe -e 0 --resource WebServerHost --stack ${AWS::StackName} --region ${AWS::Region}"
+                                },
+                                "waitAfterCompletion": "0"
+                            }
+                        }
+                    }
+                }
+            },
+            "Properties": {
+                "KeyName": {
+                    "Ref": "KeyPair"
+                },
+                "ImageId": {
+                    "Fn::FindInMap": [
+                        "AWSAMIRegionMap",
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        "WS2012R2"
+                    ]
+                },
+                "InstanceType": "t2.xlarge",
+                "SecurityGroupIds": [
+                    {
+                        "Ref": "WebServerSecurityGroup"
+                    }
+                ],
+                "IamInstanceProfile": {
+                    "Ref": "LogRoleInstanceProfile"
+                },
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Sub": "<script>\nwmic product where \"description='Amazon SSM Agent' \" uninstall\nwmic product where \"description='aws-cfn-bootstrap' \" uninstall \nstart /wait c:\\\\Windows\\\\system32\\\\msiexec /passive /qn /i https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-win64-latest.msi\npowershell.exe -Command \"iwr https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/windows_amd64/AmazonSSMAgentSetup.exe  -UseBasicParsing -OutFile C:\\\\AmazonSSMAgentSetup.exe\"\nstart /wait C:\\\\AmazonSSMAgentSetup.exe /install /quiet\ncfn-init.exe -v -c config -s ${AWS::StackName} --resource WebServerHost --region ${AWS::Region} \n</script>\n"
+                    }
+                }
+            }
+        },
+        "LogGroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+                "RetentionInDays": 7
+            }
+        },
+        "404MetricFilter": {
+            "Type": "AWS::Logs::MetricFilter",
+            "Properties": {
+                "LogGroupName": {
+                    "Ref": "LogGroup"
+                },
+                "FilterPattern": "[timestamps, serverip, method, uri, query, port, dash, clientip, useragent, status_code = 404, ...]",
+                "MetricTransformations": [
+                    {
+                        "MetricValue": "1",
+                        "MetricNamespace": "test/404s",
+                        "MetricName": "test404Count"
+                    }
+                ]
+            }
+        },
+        "404Alarm": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmDescription": "The number of 404s is greater than 2 over 2 minutes",
+                "MetricName": "test404Count",
+                "Namespace": "test/404s",
+                "Statistic": "Sum",
+                "Period": "60",
+                "EvaluationPeriods": "2",
+                "Threshold": "2",
+                "AlarmActions": [
+                    {
+                        "Ref": "AlarmNotificationTopic"
+                    }
+                ],
+                "ComparisonOperator": "GreaterThanThreshold"
+            }
+        },
+        "AlarmNotificationTopic": {
+            "Type": "AWS::SNS::Topic",
+            "Properties": {
+                "Subscription": [
+                    {
+                        "Endpoint": {
+                            "Ref": "OperatorEmail"
+                        },
+                        "Protocol": "email"
+                    }
+                ]
+            }
+        }
+    },
+    "Outputs": {
+        "InstanceId": {
+            "Description": "The instance ID of the web server",
+            "Value": {
+                "Ref": "WebServerHost"
+            }
+        },
+        "WebsiteURL": {
+            "Value": {
+                "Fn::Sub": "http://${WebServerHost.PublicDnsName}"
+            },
+            "Description": "URL for newly created IIS web server"
+        },
+        "PublicIP": {
+            "Description": "Public IP address of the web server",
+            "Value": {
+                "Fn::GetAtt": [
+                    "WebServerHost",
+                    "PublicIp"
+                ]
+            }
+        },
+        "CloudWatchLogGroupName": {
+            "Description": "The name of the CloudWatch log group",
+            "Value": {
+                "Ref": "LogGroup"
+            }
+        }
+    }
+}
