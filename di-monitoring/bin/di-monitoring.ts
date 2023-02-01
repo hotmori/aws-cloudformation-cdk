@@ -16,6 +16,7 @@ new DiMonitoringParentStack(app, 'DiMonitoringParentStack', {
     /* Uncomment the next line if you know exactly what Account and Region you
      * want to deploy the stack to. */
     env: {account: '398910053788', region: 'us-east-1'},
+    description: "Parent Stack for Monitoring"
 
     /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
 });

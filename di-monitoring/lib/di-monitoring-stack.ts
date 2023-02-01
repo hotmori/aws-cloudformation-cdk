@@ -19,7 +19,7 @@ import {IAlarmRule} from "aws-cdk-lib/aws-cloudwatch/lib/alarm-base";
 import {DiInstanceConfig} from "./di-instance-config";
 
 
-export class DiMonitoringStack extends cdk.Stack {
+export class DiMonitoringStack extends cdk.NestedStack {
 
     private cfg: DiInstanceConfig
 

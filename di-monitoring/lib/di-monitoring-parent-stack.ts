@@ -1,18 +1,10 @@
 import * as cdk from 'aws-cdk-lib';
-import {RemovalPolicy} from 'aws-cdk-lib';
+import {RemovalPolicy, StackProps} from 'aws-cdk-lib';
 import {Construct} from 'constructs';
 import {DiMonitoringStackConfig} from "./di-monitoring-stack-config";
 import {SnsAction} from "aws-cdk-lib/aws-cloudwatch-actions";
 import {Topic} from "aws-cdk-lib/aws-sns";
-import {
-    Instance,
-    InstanceClass,
-    InstanceSize,
-    InstanceType,
-    MachineImage,
-    SecurityGroup,
-    Vpc
-} from "aws-cdk-lib/aws-ec2";
+import {SecurityGroup, Vpc} from "aws-cdk-lib/aws-ec2";
 import {CfnInstanceProfile, ManagedPolicy, Role, ServicePrincipal} from "aws-cdk-lib/aws-iam";
 import {DiMonitoringStack} from "./di-monitoring-stack";
 import {DiInstanceConfig} from "./di-instance-config";
@@ -29,7 +21,12 @@ export class DiMonitoringParentStack extends cdk.Stack {
 
         this.getEc2InstancesConfigs(commonConfig)
             .forEach(cfg => {
-                new DiMonitoringStack(this, `${cfg.instanceName}MonitoringStack`, cfg, props)
+                const currentProps: StackProps = {
+                    description: "Monitoring Stack for " + cfg.instanceName,
+                    stackName: commonConfig.prefix + "MonitoringStack" + cfg.instanceName.replace(/_/g,"-")
+                }
+                const stackProps: StackProps = Object.assign({}, props, currentProps)
+                const stack = new DiMonitoringStack(this, `${cfg.instanceName}MonitoringStack`, cfg, stackProps)
             });
     }
 
@@ -74,8 +71,8 @@ export class DiMonitoringParentStack extends cdk.Stack {
         const action = new SnsAction(topic)
 
         const alarmActions: DiAlarmActions = {
-            dev:action,
-            prod:action
+            dev: action,
+            prod: action
         }
 
         return new DiMonitoringStackConfig(
