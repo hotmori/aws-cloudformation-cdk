@@ -31,7 +31,7 @@ export class DiMonitoringStack extends cdk.NestedStack {
 
     private createDashboard() {
         const dashboard = new Dashboard(this, `${this.cfg.instanceName}_Dashboard`, {
-            dashboardName: `${this.cfg.instanceName}_Test_Dashboard`,
+            dashboardName: `${this.cfg.instanceName}_Dashboard`,
         })
         dashboard.applyRemovalPolicy(RemovalPolicy.DESTROY)
 

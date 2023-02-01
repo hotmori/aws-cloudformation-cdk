@@ -88,7 +88,7 @@ export class DiMonitoringParentStack extends cdk.Stack {
     private getEc2InstancesConfigs(commonConfig: DiMonitoringStackConfig): DiInstanceConfig[] {
         return [
             this.getEvotecTestInstanceConfig(commonConfig),
-            this.getEvotecProdInstanceConfig(commonConfig),
+            // this.getEvotecProdInstanceConfig(commonConfig),
         ];
     }
 
