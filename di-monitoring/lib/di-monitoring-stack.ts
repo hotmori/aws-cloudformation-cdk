@@ -17,23 +17,41 @@ import {
 } from "aws-cdk-lib/aws-cloudwatch";
 import {IAlarmRule} from "aws-cdk-lib/aws-cloudwatch/lib/alarm-base";
 import {DiInstanceConfig} from "./di-instance-config";
+import {Instance} from "aws-cdk-lib/aws-ec2";
 
 
 export class DiMonitoringStack extends cdk.NestedStack {
 
     private cfg: DiInstanceConfig
+    private ec2InstanceId: string;
 
-    constructor(scope: Construct, id: string, instanceConfig: DiInstanceConfig, props?: cdk.StackProps) {
+    constructor(scope: Construct, id: string, instanceConfig: DiInstanceConfig, props?: cdk.NestedStackProps) {
         super(scope, id, props);
         this.cfg = instanceConfig;
+        if (this.cfg.instanceId) {
+            this.ec2InstanceId = this.cfg.instanceId
+        } else {
+            this.createInstance();
+        }
         this.createDashboard();
     }
 
-    private createDashboard() {
-        const dashboard = new Dashboard(this, `${this.cfg.instanceName}_Dashboard`, {
-            dashboardName: `${this.cfg.instanceName}_Dashboard`,
+    private createInstance() {
+        const instance = new Instance(this, this.cfg.instanceProps.instanceName!, this.cfg.instanceProps)
+        instance.node.tryRemoveChild('InstanceProfile');
+        instance.instance.iamInstanceProfile = this.cfg.instanceProfileName;
+        instance.applyRemovalPolicy(RemovalPolicy.RETAIN)
+        this.ec2InstanceId = instance.instanceId
+    }
+
+    private createDashboard(empty = false) {
+        const dashboard = new Dashboard(this, `${this.cfg.instanceProps.instanceName}_Dashboard`, {
+            dashboardName: `${this.cfg.instanceProps.instanceName}_Dashboard`,
         })
         dashboard.applyRemovalPolicy(RemovalPolicy.DESTROY)
+        if (empty) {
+            return;
+        }
 
         const cpuUsageAlarm = this.createCpuUsageAlarm()
         cpuUsageAlarm.addAlarmAction(this.cfg.alarmAction)
@@ -50,7 +68,7 @@ export class DiMonitoringStack extends cdk.NestedStack {
         generalAlarm.addAlarmAction(this.cfg.alarmAction)
 
         const generalWidget = new AlarmStatusWidget({
-            title: `${this.cfg.instanceName} General`,
+            title: `${this.cfg.instanceProps.instanceName} General`,
             alarms: [generalAlarm],
             height: 2,
             width: 6,
@@ -59,7 +77,7 @@ export class DiMonitoringStack extends cdk.NestedStack {
         dashboard.addWidgets(generalWidget)
 
         const alarmsWidget = new AlarmStatusWidget({
-            title: `${this.cfg.instanceName} Alarms`,
+            title: `${this.cfg.instanceProps.instanceName} Alarms`,
             alarms: [
                 cpuUsageAlarm,
                 browserErrorsAlarm,
@@ -77,7 +95,7 @@ export class DiMonitoringStack extends cdk.NestedStack {
                     metricName: "CPUUtilization",
                     namespace: "AWS/EC2",
                     dimensionsMap: {
-                        InstanceId: this.cfg.instanceId
+                        InstanceId: this.ec2InstanceId
                     }
                 })
             ],
@@ -130,8 +148,8 @@ export class DiMonitoringStack extends cdk.NestedStack {
     }
 
     private createBrowserErrorsAlarm(): Alarm {
-        return new Alarm(this, `${this.cfg.instanceName}_Browser_Errors_Alarm`, {
-            alarmName: `${this.cfg.instanceName} Browser Errors Alarm`,
+        return new Alarm(this, `${this.cfg.instanceProps.instanceName}_Browser_Errors_Alarm`, {
+            alarmName: `${this.cfg.instanceProps.instanceName} Browser Errors Alarm`,
             // actionsEnabled: true,
             metric: new Metric({
                 metricName: "Browser_errors_count",
@@ -148,8 +166,8 @@ export class DiMonitoringStack extends cdk.NestedStack {
     }
 
     private createOracleErrorsAlarm(): Alarm {
-        return new Alarm(this, `${this.cfg.instanceName}_Oracle_Errors_Alarm`, {
-            alarmName: `${this.cfg.instanceName} Oracle Errors Alarm`,
+        return new Alarm(this, `${this.cfg.instanceProps.instanceName}_Oracle_Errors_Alarm`, {
+            alarmName: `${this.cfg.instanceProps.instanceName} Oracle Errors Alarm`,
             // actionsEnabled: true,
             metric: new Metric({
                 metricName: "Oracle_errors_count",
@@ -166,14 +184,14 @@ export class DiMonitoringStack extends cdk.NestedStack {
     }
 
     createCpuUsageAlarm(): Alarm {
-        return new Alarm(this, `${this.cfg.instanceName}_CPU_Usage_Alarm`, {
-            alarmName: `${this.cfg.instanceName} CPU Usage Alarm`,
+        return new Alarm(this, `${this.cfg.instanceProps.instanceName}_CPU_Usage_Alarm`, {
+            alarmName: `${this.cfg.instanceProps.instanceName} CPU Usage Alarm`,
             // actionsEnabled: true,
             metric: new Metric({
                 metricName: "CPUUtilization",
                 namespace: "AWS/EC2",
                 dimensionsMap: {
-                    InstanceId: this.cfg.instanceId
+                    InstanceId: this.ec2InstanceId
                 }
             }),
             evaluationPeriods: 1,
@@ -186,8 +204,8 @@ export class DiMonitoringStack extends cdk.NestedStack {
 
     private createGeneralAlarm(alarms: IAlarmRule[]): CompositeAlarm {
         const alarmRule = AlarmRule.anyOf(...alarms)
-        return new CompositeAlarm(this, `${this.cfg.instanceName}_General_Alarm`, {
-            compositeAlarmName: `${this.cfg.instanceName} General Alarm`,
+        return new CompositeAlarm(this, `${this.cfg.instanceProps.instanceName}_General_Alarm`, {
+            compositeAlarmName: `${this.cfg.instanceProps.instanceName} General Alarm`,
             alarmRule
         })
     }

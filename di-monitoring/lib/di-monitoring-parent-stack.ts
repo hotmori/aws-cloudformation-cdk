@@ -1,16 +1,14 @@
 import * as cdk from 'aws-cdk-lib';
-import {RemovalPolicy, StackProps} from 'aws-cdk-lib';
+import {NestedStackProps, RemovalPolicy} from 'aws-cdk-lib';
 import {Construct} from 'constructs';
 import {DiMonitoringStackConfig} from "./di-monitoring-stack-config";
 import {SnsAction} from "aws-cdk-lib/aws-cloudwatch-actions";
 import {Topic} from "aws-cdk-lib/aws-sns";
-import {SecurityGroup, Vpc} from "aws-cdk-lib/aws-ec2";
+import {InstanceClass, InstanceSize, InstanceType, MachineImage, SecurityGroup, Vpc} from "aws-cdk-lib/aws-ec2";
 import {CfnInstanceProfile, ManagedPolicy, Role, ServicePrincipal} from "aws-cdk-lib/aws-iam";
 import {DiMonitoringStack} from "./di-monitoring-stack";
 import {DiInstanceConfig} from "./di-instance-config";
 import {DiAlarmActions} from "./di-alarm-actions";
-
-// import * as sqs from 'aws-cdk-lib/aws-sqs';
 
 export class DiMonitoringParentStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -21,12 +19,10 @@ export class DiMonitoringParentStack extends cdk.Stack {
 
         this.getEc2InstancesConfigs(commonConfig)
             .forEach(cfg => {
-                const currentProps: StackProps = {
-                    description: "Monitoring Stack for " + cfg.instanceName,
-                    stackName: commonConfig.prefix + "MonitoringStack" + cfg.instanceName.replace(/_/g,"-")
+                const currentProps: NestedStackProps = {
+                    description: "Monitoring Stack for " + cfg.instanceProps.instanceName,
                 }
-                const stackProps: StackProps = Object.assign({}, props, currentProps)
-                const stack = new DiMonitoringStack(this, `${cfg.instanceName}MonitoringStack`, cfg, stackProps)
+                new DiMonitoringStack(this, `${cfg.instanceProps.instanceName}MonitoringStack`, cfg, currentProps)
             });
     }
 
@@ -94,50 +90,39 @@ export class DiMonitoringParentStack extends cdk.Stack {
 
     private getEvotecTestInstanceConfig(commonConfig: DiMonitoringStackConfig): DiInstanceConfig {
         const instanceName = `${commonConfig.prefix}_Evotec_TEST`
-        // const instance = new Instance(this, instanceName, {
-        //     vpc: commonConfig.vpc,
-        //     role: commonConfig.role,
-        //     securityGroup: commonConfig.securityGroup,
-        //     instanceName,
-        //     instanceType: InstanceType.of(InstanceClass.T2, InstanceSize.MEDIUM),
-        //     machineImage: MachineImage.lookup({
-        //         name: 'DI_Evotec_image',
-        //         windows: true
-        //     }),
-        // })
-        // instance.node.tryRemoveChild('InstanceProfile');
-        // instance.instance.iamInstanceProfile = commonConfig.instanceProfile.instanceProfileName;
-        // instance.applyRemovalPolicy(RemovalPolicy.RETAIN)
-
         return {
-            instanceName,
-            // instanceId: instance.instanceId,
-            instanceId: 'i-0dda71dda688fb7f9',
+            instanceProps: {
+                vpc: commonConfig.vpc,
+                role: commonConfig.role,
+                securityGroup: commonConfig.securityGroup,
+                instanceName,
+                instanceType: InstanceType.of(InstanceClass.T2, InstanceSize.MEDIUM),
+                machineImage: MachineImage.lookup({
+                    name: 'DI_Evotec_image',
+                    windows: true
+                }),
+            },
+            instanceProfileName: commonConfig.instanceProfile.instanceProfileName,
             alarmAction: commonConfig.alarmActions.dev
         }
     }
 
     private getEvotecProdInstanceConfig(commonConfig: DiMonitoringStackConfig): DiInstanceConfig {
         const instanceName = `${commonConfig.prefix}_Evotec_PROD`
-        // const instance = new Instance(this, instanceName, {
-        //     vpc: commonConfig.vpc,
-        //     // role: commonConfig.role,
-        //     // securityGroup: commonConfig.securityGroup,
-        //     instanceName,
-        //     instanceType: InstanceType.of(InstanceClass.T3, InstanceSize.LARGE),
-        //     machineImage: MachineImage.lookup({
-        //         name: 'DI_Evotec_image',
-        //         windows: true
-        //     }),
-        // })
-        // instance.node.tryRemoveChild('InstanceProfile');
-        // instance.instance.iamInstanceProfile = commonConfig.instanceProfile.instanceProfileName;
-        // instance.applyRemovalPolicy(RemovalPolicy.RETAIN)
-
         return {
-            instanceName,
-            // instanceId: instance.instanceId,
             instanceId: 'i-0b0728963b2a5650c',
+            instanceProps: {
+                vpc: commonConfig.vpc,
+                // role: commonConfig.role,
+                // securityGroup: commonConfig.securityGroup,
+                instanceName,
+                instanceType: InstanceType.of(InstanceClass.T3, InstanceSize.LARGE),
+                machineImage: MachineImage.lookup({
+                    name: 'DI_Evotec_image',
+                    windows: true
+                }),
+            },
+            instanceProfileName: commonConfig.instanceProfile.instanceProfileName,
             alarmAction: commonConfig.alarmActions.prod
         }
     }
