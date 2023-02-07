@@ -1,0 +1,9 @@
+{
+  "instances" : [ {"instance_name":"DI_Evotec_DEV",
+                   "instance_id":"i-0149157d096ee3b5d"
+				   },
+				   {"instance_name":"DI_Evotec_MERGER",
+                   "instance_id":"i-0d12f2ed200767e15"
+				   }
+			    ]
+}

@@ -1,15 +1,14 @@
 {
-  "name": "di-monitoring",
+  "name": "sre-monitoring",
   "version": "0.1.0",
   "bin": {
-    "di-monitoring": "bin/di-monitoring.js"
+    "sre-monitoring": "bin/sre-monitoring.js"
   },
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest",
-    "cdk": "cdk",
-    "deploy:all": "cdk deploy --all"
+    "cdk": "cdk"
   },
   "devDependencies": {
     "@types/jest": "^29.4.0",

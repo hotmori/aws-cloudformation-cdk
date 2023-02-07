@@ -1,13 +1,13 @@
 // import * as cdk from 'aws-cdk-lib';
 // import { Template } from 'aws-cdk-lib/assertions';
-// import * as DiMonitoring from '../lib/di-monitoring-stack';
+// import * as SreMonitoring from '../lib/sre-monitoring-stack';
 
 // example test. To run these tests, uncomment this file along with the
-// example resource in lib/di-monitoring-stack.ts
+// example resource in lib/sre-monitoring-stack.ts
 test('SQS Queue Created', () => {
 //   const app = new cdk.App();
 //     // WHEN
-//   const stack = new DiMonitoring.DiMonitoringStack(app, 'MyTestStack');
+//   const stack = new SreMonitoring.SreMonitoringStack(app, 'MyTestStack');
 //     // THEN
 //   const template = Template.fromStack(stack);
 

@@ -1,0 +1,35 @@
+{
+  "vpc-provider:account=398910053788:filter.vpc-id=vpc-03a3e990c14e40ffc:region=us-east-1:returnAsymmetricSubnets=true": {
+    "vpcId": "vpc-03a3e990c14e40ffc",
+    "vpcCidrBlock": "10.1.0.0/16",
+    "availabilityZones": [],
+    "subnetGroups": [
+      {
+        "name": "Public",
+        "type": "Public",
+        "subnets": [
+          {
+            "subnetId": "subnet-0e59e1f261d9b8f12",
+            "cidr": "10.1.2.0/24",
+            "availabilityZone": "us-east-1a",
+            "routeTableId": "rtb-07c2007a854ac4ed5"
+          }
+        ]
+      },
+      {
+        "name": "Isolated",
+        "type": "Isolated",
+        "subnets": [
+          {
+            "subnetId": "subnet-0aa589da8f25d12d3",
+            "cidr": "10.1.1.0/24",
+            "availabilityZone": "us-east-1a",
+            "routeTableId": "rtb-00b7a282074af2823"
+          }
+        ]
+      }
+    ]
+  },
+  "ami:account=398910053788:filters.image-type.0=machine:filters.name.0=DI_Evotec_image:filters.platform.0=windows:filters.state.0=available:region=us-east-1": "ami-08a9e145a281f361e",
+  "ami:account=398910053788:filters.image-type.0=machine:filters.name.0=DI_Evotec_image2:filters.platform.0=windows:filters.state.0=available:region=us-east-1": "ami-0866aec83a6bcbbb7"
+}
