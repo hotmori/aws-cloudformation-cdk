@@ -2,16 +2,16 @@ import * as cdk from 'aws-cdk-lib';
 import {NestedStackProps} from 'aws-cdk-lib';
 import {Construct} from 'constructs';
 import {InstanceClass, InstanceSize, InstanceType, MachineImage} from "aws-cdk-lib/aws-ec2"
-import {SreMonitoringStackConfig} from "./sre-monitoring-stack-config";
-import {SreMonitoringRole} from "./sre-monitoring-role";
-import {SreMonitoringInstanceProfile} from "./sre-monitoring-instance-profile"
-import {SreMonitoringVpc} from "./sre-monitoring-vpc";
-import {SreInstanceConfig} from "./sre-instance-config";
-import {SreMonitoringStack} from "./sre-monitoring-stack";
-import instancesJson from "../config_instances/instances.json"
-import {SreMonitoringNotification} from "./sre-monitoring-notification";
-import {SreAlarmActions} from "./sre-alarm-actions";
-import {SreMonitoringSecurityGroup} from "./sre-monitoring-security-group";
+import {SreMonitoringStackConfig} from "../configs/sre-monitoring-stack-config";
+import {SreMonitoringRole} from "../resources/sre-monitoring-role";
+import {SreMonitoringInstanceProfile} from "../resources/sre-monitoring-instance-profile"
+import {SreMonitoringVpc} from "../resources/sre-monitoring-vpc";
+import {SreInstanceConfig} from "../configs/sre-instance-config";
+import {SreMonitoringInstanceStack} from "./sre-monitoring-instance-stack";
+import instancesJson from "../../config_instances/instances.json"
+import {SreMonitoringNotification} from "../resources/sre-monitoring-notification";
+import {SreAlarmActions} from "../resources/sre-alarm-actions";
+import {SreMonitoringSecurityGroup} from "../resources/sre-monitoring-security-group";
 
 export class SreMonitoringParentStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -25,7 +25,7 @@ export class SreMonitoringParentStack extends cdk.Stack {
                 const currentProps: NestedStackProps = {
                     description: "Monitoring Stack for " + cfg.instanceProps.instanceName,
                 }
-                new SreMonitoringStack(this, `${commonConfig.prefix}_InstanceMonitoringStack_${cfg.instanceProps.instanceName}`, cfg, currentProps)
+                new SreMonitoringInstanceStack(this, `${commonConfig.prefix}_InstanceMonitoringStack_${cfg.instanceProps.instanceName}`, cfg, currentProps)
             });
     }
 

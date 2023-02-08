@@ -16,10 +16,10 @@ import {
   TreatMissingData
 } from "aws-cdk-lib/aws-cloudwatch";
 import {IAlarmRule} from "aws-cdk-lib/aws-cloudwatch/lib/alarm-base";
-import {SreInstanceConfig} from "./sre-instance-config";
+import {SreInstanceConfig} from "../configs/sre-instance-config";
 import {Instance} from "aws-cdk-lib/aws-ec2";
 
-export class SreMonitoringStack extends cdk.NestedStack {
+export class SreMonitoringInstanceStack extends cdk.NestedStack {
 
   private cfg: SreInstanceConfig
   private ec2InstanceId: string;
@@ -28,20 +28,7 @@ export class SreMonitoringStack extends cdk.NestedStack {
     super(scope, id, props);
     this.cfg = instanceConfig;
     this.ec2InstanceId = this.cfg.instanceId;
-    /*if (this.cfg.instanceId) {
-      this.ec2InstanceId = this.cfg.instanceId
-    } else {
-      this.createInstance();
-    }*/
     this.createDashboard();
-  }
-
-  private createInstance() {
-    const instance = new Instance(this, this.cfg.instanceProps.instanceName!, this.cfg.instanceProps)
-    instance.node.tryRemoveChild('InstanceProfile');
-    instance.instance.iamInstanceProfile = this.cfg.instanceProfileName;
-    instance.applyRemovalPolicy(RemovalPolicy.RETAIN)
-    this.ec2InstanceId = instance.instanceId
   }
 
   private createDashboard(empty = false) {

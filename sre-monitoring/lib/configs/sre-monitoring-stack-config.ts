@@ -1,6 +1,6 @@
 import {IVpc, SecurityGroup} from "aws-cdk-lib/aws-ec2";
 import {CfnInstanceProfile, Role} from "aws-cdk-lib/aws-iam";
-import {SreAlarmActions} from "./sre-alarm-actions";
+import {SreAlarmActions} from "../resources/sre-alarm-actions";
 
 export class SreMonitoringStackConfig {
 

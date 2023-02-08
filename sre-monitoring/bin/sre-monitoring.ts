@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
-import {SreMonitoringParentStack} from "../lib/sre-monitoring-parent-stack";
+import {SreMonitoringParentStack} from "../lib/stacks/sre-monitoring-parent-stack";
 
 const app = new cdk.App();
 new SreMonitoringParentStack(app, 'SreMonitoringParentStack', {
