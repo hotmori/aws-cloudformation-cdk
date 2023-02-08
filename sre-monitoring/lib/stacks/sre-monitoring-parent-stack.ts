@@ -50,16 +50,8 @@ export class SreMonitoringParentStack extends cdk.Stack {
     }
 
     private getEc2InstancesConfigs(commonConfig: SreMonitoringStackConfig): SreInstanceConfig[] {
-        let instancesConfig:SreInstanceConfig[]= new Array();
-
-        const instances = instancesJson.instances;
-        instances.forEach( (element) => {
-            let cfg = this.getInstanceConfig(commonConfig,`${element.instance_name}`,`${element.instance_id}`);
-            instancesConfig.push( cfg );
-            }
-        );
-
-        return instancesConfig;
+         return instancesJson.instances
+            .map(instance => this.getInstanceConfig(commonConfig, instance.instance_name, instance.instance_id));
     }
 
     private getInstanceConfig(commonConfig: SreMonitoringStackConfig,
