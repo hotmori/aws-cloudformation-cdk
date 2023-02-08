@@ -14,11 +14,13 @@ export class SreMonitoringRole {
             `${prefix}_MonitoringCloudWatchAgentServerPolicy`,
             "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy");
 
+        const roleName:string = `${prefix}_MonitoringCloudAgentSSMRole`;
         this.role = new Role(
             scope,
-            `${prefix}_MonitoringCloudAgentSSMRole`,
+            roleName,
             {
-                assumedBy: new ServicePrincipal('ec2.amazonaws.com')
+                assumedBy: new ServicePrincipal('ec2.amazonaws.com'),
+                roleName: roleName
             }
         )
 

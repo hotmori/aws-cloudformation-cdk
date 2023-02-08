@@ -25,7 +25,10 @@ export class SreMonitoringParentStack extends cdk.Stack {
                 const currentProps: NestedStackProps = {
                     description: "Monitoring Stack for " + cfg.instanceProps.instanceName,
                 }
-                new SreMonitoringInstanceStack(this, `${commonConfig.prefix}_InstanceMonitoringStack_${cfg.instanceProps.instanceName}`, cfg, currentProps)
+                new SreMonitoringInstanceStack(this,
+                    commonConfig.prefix,
+                    cfg,
+                    currentProps)
             });
     }
 
@@ -39,6 +42,8 @@ export class SreMonitoringParentStack extends cdk.Stack {
         const alarmActions:SreAlarmActions = {dev:notification.action,
                                               prod:notification.action};
 
+
+
         return new SreMonitoringStackConfig(
             prefix,
             vpc,
@@ -50,7 +55,7 @@ export class SreMonitoringParentStack extends cdk.Stack {
     }
 
     private getEc2InstancesConfigs(commonConfig: SreMonitoringStackConfig): SreInstanceConfig[] {
-         return instancesJson.instances
+        return instancesJson.instances
             .map(instance => this.getInstanceConfig(commonConfig, instance.instance_name, instance.instance_id));
     }
 
@@ -73,7 +78,7 @@ export class SreMonitoringParentStack extends cdk.Stack {
                 }),
             },
             instanceProfileName: commonConfig.instanceProfile.instanceProfileName,
-            alarmAction: commonConfig.alarmAction.dev
+            alarmAction: commonConfig.alarmActions.dev
         }
     }
 }

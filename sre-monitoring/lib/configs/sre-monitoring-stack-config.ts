@@ -9,6 +9,6 @@ export class SreMonitoringStackConfig {
                        public instanceProfile: CfnInstanceProfile,
                        public role: Role,
                        public securityGroup: SecurityGroup,
-                       public alarmAction: SreAlarmActions) {
+                       public alarmActions: SreAlarmActions) {
     }
 }

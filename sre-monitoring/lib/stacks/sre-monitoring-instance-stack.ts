@@ -17,23 +17,52 @@ import {
 } from "aws-cdk-lib/aws-cloudwatch";
 import {IAlarmRule} from "aws-cdk-lib/aws-cloudwatch/lib/alarm-base";
 import {SreInstanceConfig} from "../configs/sre-instance-config";
-import {Instance} from "aws-cdk-lib/aws-ec2";
+import {SreMonitoringLogGroup} from "../resources/sre-monitoring-log-group";
 
 export class SreMonitoringInstanceStack extends cdk.NestedStack {
 
   private cfg: SreInstanceConfig
   private ec2InstanceId: string;
+  private prefix: string;
 
-  constructor(scope: Construct, id: string, instanceConfig: SreInstanceConfig, props?: cdk.NestedStackProps) {
+  private logGroupBrowser:SreMonitoringLogGroup;
+  private logGroupBrowserScheduler:SreMonitoringLogGroup;
+  private logGroupOracleAlert:SreMonitoringLogGroup;
+
+  constructor(scope: Construct,
+              prefix:string,
+              instanceConfig: SreInstanceConfig,
+              props?: cdk.NestedStackProps) {
+    const id:string = `${prefix}_InstanceMonitoringStack_${instanceConfig.instanceProps.instanceName}`;
     super(scope, id, props);
     this.cfg = instanceConfig;
     this.ec2InstanceId = this.cfg.instanceId;
+    this.prefix = prefix;
+
+    this.createLogGroups();
     this.createDashboard();
   }
 
+  private createLogGroups() {
+
+    this.logGroupBrowser = new SreMonitoringLogGroup(this,
+                                                     this.prefix,
+                                                     this.ec2InstanceId,
+                                                     'browser' );
+    this.logGroupBrowserScheduler = new SreMonitoringLogGroup(this,
+                                                              this.prefix,
+                                                              this.ec2InstanceId,
+                                                    'browser.scheduler' );
+    this.logGroupOracleAlert = new SreMonitoringLogGroup(this,
+                                                         this.prefix,
+                                                         this.ec2InstanceId,
+                                              'oracle.alert' );
+  };
+
   private createDashboard(empty = false) {
-    const dashboard = new Dashboard(this, `${this.cfg.instanceProps.instanceName}_Dashboard`, {
-      dashboardName: `${this.cfg.instanceProps.instanceName}_Dashboard`,
+    const dashboardName:string = `${this.prefix}_${this.cfg.instanceProps.instanceName}_Dashboard`;
+    const dashboard = new Dashboard(this, dashboardName, {
+      dashboardName: dashboardName,
     })
     dashboard.applyRemovalPolicy(RemovalPolicy.DESTROY)
     if (empty) {
@@ -117,9 +146,9 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
     const logsQueryWidget = new LogQueryWidget({
       title: 'Consolidated log',
       logGroupNames: [
-        'i-0b0728963b2a5650c_alert_orcl_pdb.log',
-        'i-0b0728963b2a5650c_browser.log',
-        'i-0b0728963b2a5650c_browser.scheduler.log'
+          `${this.logGroupBrowser.logGroup.logGroupName}`,
+          `${this.logGroupBrowserScheduler.logGroup.logGroupName}`,
+          `${this.logGroupOracleAlert.logGroup.logGroupName}`
       ],
       queryLines: [
         'fields @timestamp, @message, @logStream, @ingestionTime',
