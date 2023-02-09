@@ -4,6 +4,9 @@
 				   },
 				   {"instance_name":"DI_Evotec_MERGER",
                    "instance_id":"i-0d12f2ed200767e15"
+				   },
+				   {"instance_name":"DI_Evotec_TEST",
+                   "instance_id":"i-0dda71dda688fb7f9"
 				   }
 			    ]
 }

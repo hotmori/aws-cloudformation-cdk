@@ -13,8 +13,10 @@ import {
   LogQueryWidget,
   Metric,
   Stats,
-  TreatMissingData
+  TreatMissingData,
+  Unit
 } from "aws-cdk-lib/aws-cloudwatch";
+import {FilterPattern, MetricFilter} from "aws-cdk-lib/aws-logs";
 import {IAlarmRule} from "aws-cdk-lib/aws-cloudwatch/lib/alarm-base";
 import {SreInstanceConfig} from "../configs/sre-instance-config";
 import {SreMonitoringLogGroup} from "../resources/sre-monitoring-log-group";
@@ -28,6 +30,8 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
   private logGroupBrowser:SreMonitoringLogGroup;
   private logGroupBrowserScheduler:SreMonitoringLogGroup;
   private logGroupOracleAlert:SreMonitoringLogGroup;
+  private metricBrowserErrors:Metric;
+  private metricOracleErrors:Metric;
 
   constructor(scope: Construct,
               prefix:string,
@@ -38,13 +42,13 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
     this.cfg = instanceConfig;
     this.ec2InstanceId = this.cfg.instanceId;
     this.prefix = prefix;
-
     this.createLogGroups();
     this.createDashboard();
   }
 
   private createLogGroups() {
 
+    //Creating an AWS CloudWatch log groups for receiving logs
     this.logGroupBrowser = new SreMonitoringLogGroup(this,
                                                      this.prefix,
                                                      this.ec2InstanceId,
@@ -57,6 +61,37 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
                                                          this.prefix,
                                                          this.ec2InstanceId,
                                               'oracle.alert' );
+
+    //Creating a metric filter for filtering errors
+    const metricBrowserFilter = new MetricFilter(this,
+        `${this.prefix}_${this.ec2InstanceId}_BrowserMetricFilter`,
+        { logGroup: this.logGroupBrowser.logGroup,
+
+                metricNamespace: `${this.prefix}_Metrics`,
+                metricName:  `${this.prefix}_${this.ec2InstanceId}_Browser_errors_count`,
+                filterPattern: FilterPattern.anyTerm('ERROR'),
+                metricValue: '1',
+                defaultValue: 0,
+                unit:Unit.COUNT
+        });
+
+    this.metricBrowserErrors = metricBrowserFilter.metric({statistic: Stats.SUM,
+      period:Duration.seconds(300)});
+
+    const metricOracleErrors = new MetricFilter(this,
+        `${this.prefix}_${this.ec2InstanceId}_OracleAlertMetricFilter`,
+        { logGroup: this.logGroupOracleAlert.logGroup,
+          metricNamespace: `${this.prefix}_Metrics`,
+          metricName:  `${this.prefix}_${this.ec2InstanceId}_Oracle_errors_count`,
+          filterPattern: FilterPattern.anyTerm('ORA-'),
+          metricValue: '1',
+          defaultValue: 0,
+          unit:Unit.COUNT
+        });
+
+    this.metricOracleErrors = metricOracleErrors.metric({statistic: Stats.SUM,
+      period:Duration.seconds(300)})
+
   };
 
   private createDashboard(empty = false) {
@@ -121,18 +156,14 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
     })
     cpuUsageGraphWidget.position(0, 4)
 
+
+
     const errorsCountGraphWidget = new GraphWidget({
       left: [
-        new Metric({
-          metricName: "Browser_errors_count",
-          namespace: "Dotmatics_metrics"
-        })
+        this.metricBrowserErrors
       ],
       right: [
-        new Metric({
-          metricName: "Oracle_errors_count",
-          namespace: "Dotmatics_metrics"
-        })
+        this.metricOracleErrors
       ],
       period: Duration.seconds(300),
       statistic: Stats.SUM,
@@ -164,15 +195,10 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
   }
 
   private createBrowserErrorsAlarm(): Alarm {
-    return new Alarm(this, `${this.cfg.instanceProps.instanceName}_Browser_Errors_Alarm`, {
-      alarmName: `${this.cfg.instanceProps.instanceName} Browser Errors Alarm`,
+    return new Alarm(this, `${this.prefix}_${this.cfg.instanceProps.instanceName}_Browser_Errors_Alarm`, {
+      alarmName: `${this.prefix}_${this.cfg.instanceProps.instanceName} Browser Errors Alarm`,
       // actionsEnabled: true,
-      metric: new Metric({
-        metricName: "Browser_errors_count",
-        namespace: "Dotmatics_metrics",
-        statistic: Stats.SUM,
-        period: Duration.seconds(300)
-      }),
+      metric: this.metricBrowserErrors,
       evaluationPeriods: 1,
       datapointsToAlarm: 1,
       threshold: 1,
@@ -182,26 +208,21 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
   }
 
   private createOracleErrorsAlarm(): Alarm {
-    return new Alarm(this, `${this.cfg.instanceProps.instanceName}_Oracle_Errors_Alarm`, {
-      alarmName: `${this.cfg.instanceProps.instanceName} Oracle Errors Alarm`,
+    return new Alarm(this, `${this.prefix}_${this.cfg.instanceProps.instanceName}_Oracle_Errors_Alarm`, {
+      alarmName: `${this.prefix}_${this.cfg.instanceProps.instanceName} Oracle Errors Alarm`,
       // actionsEnabled: true,
-      metric: new Metric({
-        metricName: "Oracle_errors_count",
-        namespace: "Dotmatics_metrics",
-        statistic: Stats.SUM,
-        period: Duration.seconds(300)
-      }),
+      metric: this.metricOracleErrors,
       evaluationPeriods: 1,
       datapointsToAlarm: 1,
-      threshold: 40,
+      threshold: 1,
       comparisonOperator: ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
       treatMissingData: TreatMissingData.NOT_BREACHING
     });
   }
 
   createCpuUsageAlarm(): Alarm {
-    return new Alarm(this, `${this.cfg.instanceProps.instanceName}_CPU_Usage_Alarm`, {
-      alarmName: `${this.cfg.instanceProps.instanceName} CPU Usage Alarm`,
+    return new Alarm(this, `${this.prefix}_${this.cfg.instanceProps.instanceName}_CPU_Usage_Alarm`, {
+      alarmName: `${this.prefix}_${this.cfg.instanceProps.instanceName} CPU Usage Alarm`,
       // actionsEnabled: true,
       metric: new Metric({
         metricName: "CPUUtilization",
@@ -220,8 +241,8 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
 
   private createGeneralAlarm(alarms: IAlarmRule[]): CompositeAlarm {
     const alarmRule = AlarmRule.anyOf(...alarms)
-    return new CompositeAlarm(this, `${this.cfg.instanceProps.instanceName}_General_Alarm`, {
-      compositeAlarmName: `${this.cfg.instanceProps.instanceName} General Alarm`,
+    return new CompositeAlarm(this, `${this.prefix}_${this.cfg.instanceProps.instanceName}_General_Alarm`, {
+      compositeAlarmName: `${this.prefix}_${this.cfg.instanceProps.instanceName} General Alarm`,
       alarmRule
     })
   }

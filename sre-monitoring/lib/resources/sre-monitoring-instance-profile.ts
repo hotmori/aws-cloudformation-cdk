@@ -8,7 +8,8 @@ export class SreMonitoringInstanceProfile {
                        public prefix:string,
                        public role_name:string) {
         this.instance_profile = new CfnInstanceProfile(scope, `${prefix}_MonitoringInstanceProfile`, {
-            roles: [role_name]
+            roles: [role_name],
+            instanceProfileName: `${prefix}_MonitoringInstanceProfile`
         })
         this.instance_profile.applyRemovalPolicy(RemovalPolicy.RETAIN)
     }

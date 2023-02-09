@@ -6,7 +6,7 @@ export class SreMonitoringRole {
     public constructor(scope: Construct, public prefix:string) {
         const amazonEC2RoleforSSM = ManagedPolicy.fromManagedPolicyArn(scope,
             `${prefix}_MonitoringAmazonEC2RoleforSSM`,
-            "arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM");
+            "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore");
         const cloudWatchAgentAdminPolicy = ManagedPolicy.fromManagedPolicyArn(scope,
             `${prefix}_MonitoringCloudWatchAgentAdminPolicy`,
             "arn:aws:iam::aws:policy/CloudWatchAgentAdminPolicy");
