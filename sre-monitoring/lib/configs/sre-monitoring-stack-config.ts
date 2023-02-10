@@ -6,8 +6,8 @@ export class SreMonitoringStackConfig {
 
     public constructor(public prefix: string,
                        public vpc: IVpc,
-                       public instanceProfile: CfnInstanceProfile,
-                       public role: Role,
+                       //public instanceProfile: CfnInstanceProfile,
+                       //public role: Role,
                        public securityGroup: SecurityGroup,
                        public alarmActions: SreAlarmActions) {
     }

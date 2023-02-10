@@ -36,7 +36,7 @@ export class SreMonitoringParentStack extends cdk.Stack {
 
         const vpc = new SreMonitoringVpc(this).vpc;
         const role = new SreMonitoringRole (this, prefix).role;
-        const instanceProfile = new SreMonitoringInstanceProfile(this, prefix, role.roleName).instance_profile;
+        //const instanceProfile = new SreMonitoringInstanceProfile(this, prefix, role.roleName).instance_profile;
         const securityGroup = new SreMonitoringSecurityGroup(this, prefix, vpc).security_group;
         const notification = new SreMonitoringNotification(this, prefix);
         const alarmActions:SreAlarmActions = {dev:notification.action,
@@ -47,8 +47,8 @@ export class SreMonitoringParentStack extends cdk.Stack {
         return new SreMonitoringStackConfig(
             prefix,
             vpc,
-            instanceProfile,
-            role,
+            //instanceProfile,
+            //role,
             securityGroup,
             alarmActions
         )
@@ -68,7 +68,7 @@ export class SreMonitoringParentStack extends cdk.Stack {
             instanceId,
             instanceProps: {
                 vpc: commonConfig.vpc,
-                role: commonConfig.role,
+                //role: commonConfig.role,
                 securityGroup: commonConfig.securityGroup,
                 instanceName,
                 instanceType: InstanceType.of(InstanceClass.T2, InstanceSize.MEDIUM),
@@ -77,7 +77,7 @@ export class SreMonitoringParentStack extends cdk.Stack {
                     windows: true
                 }),
             },
-            instanceProfileName: commonConfig.instanceProfile.instanceProfileName,
+            //instanceProfileName: commonConfig.instanceProfile.instanceProfileName,
             alarmAction: commonConfig.alarmActions.dev
         }
     }
