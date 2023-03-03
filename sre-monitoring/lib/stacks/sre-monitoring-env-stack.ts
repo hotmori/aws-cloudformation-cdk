@@ -19,13 +19,14 @@ import {
 } from "aws-cdk-lib/aws-cloudwatch";
 import {FilterPattern, MetricFilter} from "aws-cdk-lib/aws-logs";
 import {IAlarmRule} from "aws-cdk-lib/aws-cloudwatch/lib/alarm-base";
-import {SreInstanceConfig} from "../configs/sre-instance-config";
+import {SreEnvConfig} from "../configs/sre-env-config";
 import {SreMonitoringLogGroup} from "../resources/sre-monitoring-log-group";
 
-export class SreMonitoringInstanceStack extends cdk.NestedStack {
+export class SreMonitoringEnvStack extends cdk.NestedStack {
 
-  private cfg: SreInstanceConfig
-  private ec2InstanceId: string;
+  private cfg: SreEnvConfig
+  private ec2AppInstanceId: string;
+  private ec2DBInstanceId: string;
   private prefix: string;
 
   private logGroupBrowser:SreMonitoringLogGroup;
@@ -36,12 +37,13 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
 
   constructor(scope: Construct,
               prefix:string,
-              instanceConfig: SreInstanceConfig,
+              instanceConfig: SreEnvConfig,
               props?: cdk.NestedStackProps) {
-    const id:string = `${prefix}_InstanceMonitoringStack_${instanceConfig.instanceName}`;
+    const id:string = `${prefix}_EnvMonitoringStack_${instanceConfig.envName}`;
     super(scope, id, props);
     this.cfg = instanceConfig;
-    this.ec2InstanceId = this.cfg.instanceId;
+    this.ec2AppInstanceId = this.cfg.appInstanceId;
+    this.ec2DBInstanceId = this.cfg.dbInstanceId;
     this.prefix = prefix;
     this.createLogGroups();
     this.createDashboard();
@@ -52,24 +54,24 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
     //Creating an AWS CloudWatch log groups for receiving logs
     this.logGroupBrowser = new SreMonitoringLogGroup(this,
                                                      this.prefix,
-                                                     this.ec2InstanceId,
+                                                     this.ec2AppInstanceId,
                                                      'browser' );
     this.logGroupBrowserScheduler = new SreMonitoringLogGroup(this,
                                                               this.prefix,
-                                                              this.ec2InstanceId,
+                                                              this.ec2AppInstanceId,
                                                     'browser.scheduler' );
     this.logGroupOracleAlert = new SreMonitoringLogGroup(this,
                                                          this.prefix,
-                                                         this.ec2InstanceId,
+                                                         this.ec2DBInstanceId,
                                               'oracle.alert' );
 
     //Creating a metric filter for filtering errors
     const metricBrowserFilter = new MetricFilter(this,
-        `${this.prefix}_${this.ec2InstanceId}_BrowserMetricFilter`,
+        `${this.prefix}_${this.ec2AppInstanceId}_BrowserMetricFilter`,
         { logGroup: this.logGroupBrowser.logGroup,
 
                 metricNamespace: `${this.prefix}_Metrics`,
-                metricName:  `${this.prefix}_${this.ec2InstanceId}_Browser_errors_count`,
+                metricName:  `${this.prefix}_${this.ec2AppInstanceId}_Browser_errors_count`,
                 filterPattern: FilterPattern.anyTerm('ERROR'),
                 metricValue: '1',
                 defaultValue: 0,
@@ -80,10 +82,10 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
       period:Duration.seconds(300)});
 
     const metricOracleErrors = new MetricFilter(this,
-        `${this.prefix}_${this.ec2InstanceId}_OracleAlertMetricFilter`,
+        `${this.prefix}_${this.ec2DBInstanceId}_OracleAlertMetricFilter`,
         { logGroup: this.logGroupOracleAlert.logGroup,
           metricNamespace: `${this.prefix}_Metrics`,
-          metricName:  `${this.prefix}_${this.ec2InstanceId}_Oracle_errors_count`,
+          metricName:  `${this.prefix}_${this.ec2DBInstanceId}_Oracle_errors_count`,
           filterPattern: FilterPattern.anyTerm('ORA-'),
           metricValue: '1',
           defaultValue: 0,
@@ -96,7 +98,7 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
   };
 
   private createDashboard(empty = false) {
-    const dashboardName:string = `${this.prefix}_${this.cfg.instanceName}_Dashboard`;
+    const dashboardName:string = `${this.prefix}_${this.cfg.envName}_Dashboard`;
     const dashboard = new Dashboard(this, dashboardName, {
       dashboardName: dashboardName,
       periodOverride:PeriodOverride.INHERIT
@@ -121,7 +123,7 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
     generalAlarm.addAlarmAction(this.cfg.alarmAction)
 
     const generalWidget = new AlarmStatusWidget({
-      title: `${this.cfg.instanceName} General`,
+      title: `${this.cfg.envName} General`,
       alarms: [generalAlarm],
       height: 2,
       width: 6,
@@ -130,7 +132,7 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
     dashboard.addWidgets(generalWidget)
 
     const alarmsWidget = new AlarmStatusWidget({
-      title: `${this.cfg.instanceName} Alarms`,
+      title: `${this.cfg.envName} Alarms`,
       alarms: [
         cpuUsageAlarm,
         browserErrorsAlarm,
@@ -148,7 +150,7 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
           metricName: "CPUUtilization",
           namespace: "AWS/EC2",
           dimensionsMap: {
-            InstanceId: this.ec2InstanceId
+            InstanceId: this.ec2AppInstanceId
           }
         })
       ],
@@ -235,8 +237,8 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
 
 
   private createBrowserErrorsAlarm(): Alarm {
-    return new Alarm(this, `${this.prefix}_${this.cfg.instanceName}_Browser_Errors_Alarm`, {
-      alarmName: `${this.prefix}_${this.cfg.instanceName} Browser Errors Alarm`,
+    return new Alarm(this, `${this.prefix}_${this.cfg.envName}_Browser_Errors_Alarm`, {
+      alarmName: `${this.prefix}_${this.cfg.envName} Browser Errors Alarm`,
       // actionsEnabled: true,
       metric: this.metricBrowserErrors,
       evaluationPeriods: 1,
@@ -248,8 +250,8 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
   }
 
   private createOracleErrorsAlarm(): Alarm {
-    return new Alarm(this, `${this.prefix}_${this.cfg.instanceName}_Oracle_Errors_Alarm`, {
-      alarmName: `${this.prefix}_${this.cfg.instanceName} Oracle Errors Alarm`,
+    return new Alarm(this, `${this.prefix}_${this.cfg.envName}_Oracle_Errors_Alarm`, {
+      alarmName: `${this.prefix}_${this.cfg.envName} Oracle Errors Alarm`,
       // actionsEnabled: true,
       metric: this.metricOracleErrors,
       evaluationPeriods: 1,
@@ -261,14 +263,14 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
   }
 
   createCpuUsageAlarm(): Alarm {
-    return new Alarm(this, `${this.prefix}_${this.cfg.instanceName}_CPU_Usage_Alarm`, {
-      alarmName: `${this.prefix}_${this.cfg.instanceName} CPU Usage Alarm`,
+    return new Alarm(this, `${this.prefix}_${this.cfg.envName}_CPU_Usage_Alarm`, {
+      alarmName: `${this.prefix}_${this.cfg.envName} CPU Usage Alarm`,
       // actionsEnabled: true,
       metric: new Metric({
         metricName: "CPUUtilization",
         namespace: "AWS/EC2",
         dimensionsMap: {
-          InstanceId: this.ec2InstanceId
+          InstanceId: this.ec2AppInstanceId
         }
       }),
       evaluationPeriods: 1,
@@ -281,8 +283,8 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
 
   private createGeneralAlarm(alarms: IAlarmRule[]): CompositeAlarm {
     const alarmRule = AlarmRule.anyOf(...alarms)
-    return new CompositeAlarm(this, `${this.prefix}_${this.cfg.instanceName}_General_Alarm`, {
-      compositeAlarmName: `${this.prefix}_${this.cfg.instanceName} General Alarm`,
+    return new CompositeAlarm(this, `${this.prefix}_${this.cfg.envName}_General_Alarm`, {
+      compositeAlarmName: `${this.prefix}_${this.cfg.envName} General Alarm`,
       alarmRule
     })
   }

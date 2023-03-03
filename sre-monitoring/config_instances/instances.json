@@ -1,15 +1,21 @@
 {
 	"region":{
 		"us-east-1":
-			[{"instance_name":"DI_Evotec_DEV",
-                   "instance_id":"i-0149157d096ee3b5d"
-				   },
-				   {"instance_name":"DI_Evotec_MERGER",
-                   "instance_id":"i-0d12f2ed200767e15"
-				   },
-				   {"instance_name":"DI_Evotec_TEST",
-                   "instance_id":"i-0dda71dda688fb7f9"
-				   }],
+			[{
+				"env_name":"DI_Evotec_DEV",
+                "app_instance_id":"i-0149157d096ee3b5d",
+				"db_instance_id":"i-0149157d096ee3b5d"
+			 },
+			{
+			   "env_name":"DI_Evotec_MERGER",
+               "app_instance_id":"i-0d12f2ed200767e15",
+			   "db_instance_id":"i-0d12f2ed200767e15"
+			},
+			{
+			   "env_name":"DI_Evotec_TEST",
+               "app_instance_id":"i-0dda71dda688fb7f9",
+			   "db_instance_id":"i-0dda71dda688fb7f9"
+			}],
 		
 		"eu-central-1":[]
 	}

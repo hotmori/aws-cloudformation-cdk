@@ -3,8 +3,8 @@ import {NestedStackProps} from 'aws-cdk-lib';
 import {Construct} from 'constructs';
 import {SreMonitoringStackConfig} from "../configs/sre-monitoring-stack-config";
 import {SreMonitoringRole} from "../resources/sre-monitoring-role";
-import {SreInstanceConfig} from "../configs/sre-instance-config";
-import {SreMonitoringInstanceStack} from "./sre-monitoring-instance-stack";
+import {SreEnvConfig} from "../configs/sre-env-config";
+import {SreMonitoringEnvStack} from "./sre-monitoring-env-stack";
 import instancesJson from "../../config_instances/instances.json"
 import {SreMonitoringNotification} from "../resources/sre-monitoring-notification";
 import {SreAlarmActions} from "../resources/sre-alarm-actions";
@@ -16,12 +16,12 @@ export class SreMonitoringParentStack extends cdk.Stack {
 
         const commonConfig = this.getCommonConfiguration(prefix);
 
-        this.getEc2InstancesConfigs(commonConfig)
+        this.getEnvironmentConfigs(commonConfig)
             .forEach(cfg => {
                 const currentProps: NestedStackProps = {
-                    description: "Monitoring Stack for " + cfg.instanceName,
+                    description: "Monitoring Stack for " + cfg.envName,
                 }
-                new SreMonitoringInstanceStack(this,
+                new SreMonitoringEnvStack(this,
                     commonConfig.prefix,
                     cfg,
                     currentProps)
@@ -43,20 +43,28 @@ export class SreMonitoringParentStack extends cdk.Stack {
         )
     }
 
-    private getEc2InstancesConfigs(commonConfig: SreMonitoringStackConfig): SreInstanceConfig[] {
+    private getEnvironmentConfigs(commonConfig: SreMonitoringStackConfig): SreEnvConfig[] {
         // @ts-ignore
         return instancesJson.region[this.region]
-            .map((instance: { instance_name: string; instance_id: string; }) => this.getInstanceConfig(commonConfig, instance.instance_name, instance.instance_id));
+            .map((env: { env_name: string;
+                         app_instance_id: string;
+                         db_instance_id: string; }) =>
+                       this.getEnvConfig(commonConfig,
+                                         env.env_name,
+                                         env.app_instance_id,
+                                         env.db_instance_id));
     }
 
-    private getInstanceConfig(commonConfig: SreMonitoringStackConfig,
-                              instanceName:string,
-                              instanceId:string): SreInstanceConfig {
+    private getEnvConfig(commonConfig: SreMonitoringStackConfig,
+                         envName:string,
+                         appInstanceId:string,
+                         dbInstanceId:string): SreEnvConfig {
 
 
         return {
-            instanceId,
-            instanceName,
+            appInstanceId: appInstanceId,
+            dbInstanceId:dbInstanceId,
+            envName: envName,
             alarmAction: commonConfig.alarmActions.dev
         }
     }
