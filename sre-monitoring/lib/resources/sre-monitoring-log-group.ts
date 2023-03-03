@@ -1,5 +1,5 @@
 import {Construct} from "constructs";
-import {LogGroup, LogStream} from "aws-cdk-lib/aws-logs";
+import {LogGroup, LogStream, RetentionDays} from "aws-cdk-lib/aws-logs";
 import {RemovalPolicy} from "aws-cdk-lib";
 
 export class SreMonitoringLogGroup {
@@ -18,6 +18,7 @@ export class SreMonitoringLogGroup {
             `${logGroupName}`,
             {
                 logGroupName:`${logGroupName}`,
+                retention: RetentionDays.ONE_MONTH,
                 removalPolicy:RemovalPolicy.DESTROY
             }
         )

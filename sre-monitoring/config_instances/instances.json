@@ -1,5 +1,7 @@
 {
-  "instances" : [ {"instance_name":"DI_Evotec_DEV",
+	"region":{
+		"us-east-1":
+			[{"instance_name":"DI_Evotec_DEV",
                    "instance_id":"i-0149157d096ee3b5d"
 				   },
 				   {"instance_name":"DI_Evotec_MERGER",
@@ -7,6 +9,9 @@
 				   },
 				   {"instance_name":"DI_Evotec_TEST",
                    "instance_id":"i-0dda71dda688fb7f9"
-				   }
-			    ]
+				   }],
+		
+		"eu-central-1":[]
+	}
+	
 }

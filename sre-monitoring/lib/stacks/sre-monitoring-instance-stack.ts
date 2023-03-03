@@ -12,6 +12,7 @@ import {
   LogQueryVisualizationType,
   LogQueryWidget,
   Metric,
+  PeriodOverride,
   Stats,
   TreatMissingData,
   Unit
@@ -37,7 +38,7 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
               prefix:string,
               instanceConfig: SreInstanceConfig,
               props?: cdk.NestedStackProps) {
-    const id:string = `${prefix}_InstanceMonitoringStack_${instanceConfig.instanceProps.instanceName}`;
+    const id:string = `${prefix}_InstanceMonitoringStack_${instanceConfig.instanceName}`;
     super(scope, id, props);
     this.cfg = instanceConfig;
     this.ec2InstanceId = this.cfg.instanceId;
@@ -95,9 +96,10 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
   };
 
   private createDashboard(empty = false) {
-    const dashboardName:string = `${this.prefix}_${this.cfg.instanceProps.instanceName}_Dashboard`;
+    const dashboardName:string = `${this.prefix}_${this.cfg.instanceName}_Dashboard`;
     const dashboard = new Dashboard(this, dashboardName, {
       dashboardName: dashboardName,
+      periodOverride:PeriodOverride.INHERIT
     })
     dashboard.applyRemovalPolicy(RemovalPolicy.DESTROY)
     if (empty) {
@@ -119,7 +121,7 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
     generalAlarm.addAlarmAction(this.cfg.alarmAction)
 
     const generalWidget = new AlarmStatusWidget({
-      title: `${this.cfg.instanceProps.instanceName} General`,
+      title: `${this.cfg.instanceName} General`,
       alarms: [generalAlarm],
       height: 2,
       width: 6,
@@ -128,7 +130,7 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
     dashboard.addWidgets(generalWidget)
 
     const alarmsWidget = new AlarmStatusWidget({
-      title: `${this.cfg.instanceProps.instanceName} Alarms`,
+      title: `${this.cfg.instanceName} Alarms`,
       alarms: [
         cpuUsageAlarm,
         browserErrorsAlarm,
@@ -155,8 +157,6 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
       width: 6
     })
     cpuUsageGraphWidget.position(0, 4)
-
-
 
     const errorsCountGraphWidget = new GraphWidget({
       left: [
@@ -192,11 +192,51 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
     })
     logsQueryWidget.position(0, 10)
     dashboard.addWidgets(logsQueryWidget)
+
+    const logsDatasourceCompleteWidget = new LogQueryWidget({
+      title: 'Datasources complete timings',
+      logGroupNames: [
+        `${this.logGroupBrowserScheduler.logGroup.logGroupName}`
+      ],
+      queryLines: [
+        'fields @timestamp, @ingestionTime',
+        'parse @message /Datasources - complete in\\s*(?<CompleteTime>[0-9]+(\\.[0-9]+)?)/',
+        'filter @message like \'Datasources - complete\'',
+        'sort @timestamp desc',
+        'limit 100',
+        'display @timestamp, @message, CompleteTime/1000/60 as CompleteTimeMinutes'
+      ],
+      view: LogQueryVisualizationType.TABLE,
+      height: 6,
+      width: 24
+    })
+    logsDatasourceCompleteWidget.position(0, 16)
+    dashboard.addWidgets(logsDatasourceCompleteWidget)
+
+    const logsDatasourceUpdatingWidget = new LogQueryWidget({
+      title: 'Datasources updating timings',
+      logGroupNames: [
+        `${this.logGroupBrowserScheduler.logGroup.logGroupName}`
+      ],
+      queryLines: [
+        'fields @timestamp, @message, @logStream, @ingestionTime',
+        'filter @message like \'Datasources - updating\'',
+        'sort @timestamp desc',
+        'limit 100',
+      ],
+      view: LogQueryVisualizationType.TABLE,
+      height: 6,
+      width: 24
+    })
+    logsDatasourceUpdatingWidget.position(0, 22)
+    dashboard.addWidgets(logsDatasourceUpdatingWidget)
   }
 
+
+
   private createBrowserErrorsAlarm(): Alarm {
-    return new Alarm(this, `${this.prefix}_${this.cfg.instanceProps.instanceName}_Browser_Errors_Alarm`, {
-      alarmName: `${this.prefix}_${this.cfg.instanceProps.instanceName} Browser Errors Alarm`,
+    return new Alarm(this, `${this.prefix}_${this.cfg.instanceName}_Browser_Errors_Alarm`, {
+      alarmName: `${this.prefix}_${this.cfg.instanceName} Browser Errors Alarm`,
       // actionsEnabled: true,
       metric: this.metricBrowserErrors,
       evaluationPeriods: 1,
@@ -208,8 +248,8 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
   }
 
   private createOracleErrorsAlarm(): Alarm {
-    return new Alarm(this, `${this.prefix}_${this.cfg.instanceProps.instanceName}_Oracle_Errors_Alarm`, {
-      alarmName: `${this.prefix}_${this.cfg.instanceProps.instanceName} Oracle Errors Alarm`,
+    return new Alarm(this, `${this.prefix}_${this.cfg.instanceName}_Oracle_Errors_Alarm`, {
+      alarmName: `${this.prefix}_${this.cfg.instanceName} Oracle Errors Alarm`,
       // actionsEnabled: true,
       metric: this.metricOracleErrors,
       evaluationPeriods: 1,
@@ -221,8 +261,8 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
   }
 
   createCpuUsageAlarm(): Alarm {
-    return new Alarm(this, `${this.prefix}_${this.cfg.instanceProps.instanceName}_CPU_Usage_Alarm`, {
-      alarmName: `${this.prefix}_${this.cfg.instanceProps.instanceName} CPU Usage Alarm`,
+    return new Alarm(this, `${this.prefix}_${this.cfg.instanceName}_CPU_Usage_Alarm`, {
+      alarmName: `${this.prefix}_${this.cfg.instanceName} CPU Usage Alarm`,
       // actionsEnabled: true,
       metric: new Metric({
         metricName: "CPUUtilization",
@@ -241,8 +281,8 @@ export class SreMonitoringInstanceStack extends cdk.NestedStack {
 
   private createGeneralAlarm(alarms: IAlarmRule[]): CompositeAlarm {
     const alarmRule = AlarmRule.anyOf(...alarms)
-    return new CompositeAlarm(this, `${this.prefix}_${this.cfg.instanceProps.instanceName}_General_Alarm`, {
-      compositeAlarmName: `${this.prefix}_${this.cfg.instanceProps.instanceName} General Alarm`,
+    return new CompositeAlarm(this, `${this.prefix}_${this.cfg.instanceName}_General_Alarm`, {
+      compositeAlarmName: `${this.prefix}_${this.cfg.instanceName} General Alarm`,
       alarmRule
     })
   }
