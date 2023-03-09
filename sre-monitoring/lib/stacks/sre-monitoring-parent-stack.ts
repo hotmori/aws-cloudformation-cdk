@@ -8,6 +8,7 @@ import {SreMonitoringEnvStack} from "./sre-monitoring-env-stack";
 import instancesJson from "../../config_instances/instances.json"
 import {SreMonitoringNotification} from "../resources/sre-monitoring-notification";
 import {SreAlarmActions} from "../resources/sre-alarm-actions";
+import {SreMonitoringLambdaDatasourcesComplete} from "../resources/sre-monitoring-lambda-ds-complete";
 
 export class SreMonitoringParentStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props: cdk.StackProps) {
@@ -31,6 +32,7 @@ export class SreMonitoringParentStack extends cdk.Stack {
     private getCommonConfiguration(prefix: string): SreMonitoringStackConfig {
         //role is needed as common resource
         const role = new SreMonitoringRole (this, prefix).role;
+        const lambda = new SreMonitoringLambdaDatasourcesComplete(this, prefix);
         const notification = new SreMonitoringNotification(this, prefix);
         const alarmActions:SreAlarmActions = {dev:notification.action,
                                               prod:notification.action};
@@ -39,6 +41,7 @@ export class SreMonitoringParentStack extends cdk.Stack {
 
         return new SreMonitoringStackConfig(
             prefix,
+            lambda,
             alarmActions
         )
     }
@@ -65,6 +68,7 @@ export class SreMonitoringParentStack extends cdk.Stack {
             appInstanceId: appInstanceId,
             dbInstanceId:dbInstanceId,
             envName: envName,
+            lambda:commonConfig.lambda,
             alarmAction: commonConfig.alarmActions.dev
         }
     }

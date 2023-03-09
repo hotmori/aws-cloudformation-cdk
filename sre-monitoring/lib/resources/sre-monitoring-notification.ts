@@ -5,6 +5,7 @@ import {SnsAction} from "aws-cdk-lib/aws-cloudwatch-actions";
 export class SreMonitoringNotification {
     readonly action: SnsAction;
     readonly subscription: Subscription;
+    readonly topic: Topic;
     public constructor(scope: Construct, public prefix:string) {
 
         const topic = new Topic(scope, `${prefix}_MonitoringTopic`);
@@ -13,11 +14,11 @@ export class SreMonitoringNotification {
                                          {topic,
                                                 protocol:SubscriptionProtocol.EMAIL,
                                                 endpoint:`test@dx.com`
-        })
+        });
         const action = new SnsAction(topic);
 
         this.subscription = subscription;
         this.action = action;
-
+        this.topic = topic;
     }
 }

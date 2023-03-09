@@ -19,7 +19,7 @@ export class SreMonitoringLogGroup {
             {
                 logGroupName:`${logGroupName}`,
                 retention: RetentionDays.ONE_MONTH,
-                removalPolicy:RemovalPolicy.DESTROY
+                removalPolicy:RemovalPolicy.RETAIN
             }
         )
 

@@ -9,15 +9,21 @@ import {
   CompositeAlarm,
   Dashboard,
   GraphWidget,
+  GraphWidgetProps,
+  GraphWidgetView,
+  LegendPosition,
   LogQueryVisualizationType,
   LogQueryWidget,
   Metric,
   PeriodOverride,
+  SingleValueWidget,
   Stats,
   TreatMissingData,
   Unit
 } from "aws-cdk-lib/aws-cloudwatch";
-import {FilterPattern, MetricFilter} from "aws-cdk-lib/aws-logs";
+
+import {LambdaDestination} from "aws-cdk-lib/aws-logs-destinations";
+import {FilterPattern, MetricFilter, SubscriptionFilter} from "aws-cdk-lib/aws-logs";
 import {IAlarmRule} from "aws-cdk-lib/aws-cloudwatch/lib/alarm-base";
 import {SreEnvConfig} from "../configs/sre-env-config";
 import {SreMonitoringLogGroup} from "../resources/sre-monitoring-log-group";
@@ -34,6 +40,7 @@ export class SreMonitoringEnvStack extends cdk.NestedStack {
   private logGroupOracleAlert:SreMonitoringLogGroup;
   private metricBrowserErrors:Metric;
   private metricOracleErrors:Metric;
+  private metricDatasourcesComplete:Metric;
 
   constructor(scope: Construct,
               prefix:string,
@@ -66,7 +73,7 @@ export class SreMonitoringEnvStack extends cdk.NestedStack {
                                               'oracle.alert' );
 
     //Creating a metric filter for filtering errors
-    const metricBrowserFilter = new MetricFilter(this,
+    const metricFilterBrowserFilter = new MetricFilter(this,
         `${this.prefix}_${this.ec2AppInstanceId}_BrowserMetricFilter`,
         { logGroup: this.logGroupBrowser.logGroup,
 
@@ -78,10 +85,10 @@ export class SreMonitoringEnvStack extends cdk.NestedStack {
                 unit:Unit.COUNT
         });
 
-    this.metricBrowserErrors = metricBrowserFilter.metric({statistic: Stats.SUM,
+    this.metricBrowserErrors = metricFilterBrowserFilter.metric({statistic: Stats.SUM,
       period:Duration.seconds(300)});
 
-    const metricOracleErrors = new MetricFilter(this,
+    const metricFilterOracleErrors = new MetricFilter(this,
         `${this.prefix}_${this.ec2DBInstanceId}_OracleAlertMetricFilter`,
         { logGroup: this.logGroupOracleAlert.logGroup,
           metricNamespace: `${this.prefix}_Metrics`,
@@ -92,8 +99,27 @@ export class SreMonitoringEnvStack extends cdk.NestedStack {
           unit:Unit.COUNT
         });
 
-    this.metricOracleErrors = metricOracleErrors.metric({statistic: Stats.SUM,
+    this.metricOracleErrors = metricFilterOracleErrors.metric({statistic: Stats.SUM,
       period:Duration.seconds(300)})
+
+
+    this.metricDatasourcesComplete =  new Metric({
+        metricName: `${this.prefix}_${this.ec2AppInstanceId}_DatasourcesCompleteTime`,
+        namespace: `${this.prefix}_Metrics`,          
+        unit:Unit.SECONDS
+      });
+
+    const subscriptionFilterName:string = `${this.prefix}_${this.ec2AppInstanceId}_DataSourceTimingsSubscriptionFilter`;
+
+    const fn = this.cfg.lambda.lambdaFunction;
+    const lambdaDestination = new LambdaDestination(fn);
+    const subscriptionFilter = new SubscriptionFilter(this,
+        subscriptionFilterName,
+        {destination: lambdaDestination,
+               filterPattern:FilterPattern.anyTerm('Datasources - complete'),
+               logGroup: this.logGroupBrowserScheduler.logGroup
+        });
+
 
   };
 
@@ -101,7 +127,8 @@ export class SreMonitoringEnvStack extends cdk.NestedStack {
     const dashboardName:string = `${this.prefix}_${this.cfg.envName}_Dashboard`;
     const dashboard = new Dashboard(this, dashboardName, {
       dashboardName: dashboardName,
-      periodOverride:PeriodOverride.INHERIT
+      periodOverride:PeriodOverride.INHERIT,
+      start:"-P1W"
     })
     dashboard.applyRemovalPolicy(RemovalPolicy.DESTROY)
     if (empty) {
@@ -109,40 +136,41 @@ export class SreMonitoringEnvStack extends cdk.NestedStack {
     }
 
     const cpuUsageAlarm = this.createCpuUsageAlarm()
-    cpuUsageAlarm.addAlarmAction(this.cfg.alarmAction)
     const browserErrorsAlarm = this.createBrowserErrorsAlarm()
-    browserErrorsAlarm.addAlarmAction(this.cfg.alarmAction)
     const oracleErrorsAlarm = this.createOracleErrorsAlarm()
-    oracleErrorsAlarm.addAlarmAction(this.cfg.alarmAction)
-
+    const dsCompleteAlarm = this.createDatasourcesCompleteAlarm()
     const generalAlarm = this.createGeneralAlarm([
       cpuUsageAlarm,
       browserErrorsAlarm,
       oracleErrorsAlarm,
+      dsCompleteAlarm
     ])
+
     generalAlarm.addAlarmAction(this.cfg.alarmAction)
+    cpuUsageAlarm.addAlarmAction(this.cfg.alarmAction)
+    browserErrorsAlarm.addAlarmAction(this.cfg.alarmAction)
+    oracleErrorsAlarm.addAlarmAction(this.cfg.alarmAction)
+    dsCompleteAlarm.addAlarmAction(this.cfg.alarmAction)
 
     const generalWidget = new AlarmStatusWidget({
       title: `${this.cfg.envName} General`,
       alarms: [generalAlarm],
-      height: 2,
-      width: 6,
+      height: 3,
+      width: 10,
     })
-    generalWidget.position(0, 0)
-    dashboard.addWidgets(generalWidget)
+
 
     const alarmsWidget = new AlarmStatusWidget({
-      title: `${this.cfg.envName} Alarms`,
+      title: `All alarms`,
       alarms: [
         cpuUsageAlarm,
         browserErrorsAlarm,
         oracleErrorsAlarm,
+        dsCompleteAlarm
       ],
-      height: 2,
-      width: 12,
+      height: 3,
+      width: 10,
     })
-    alarmsWidget.position(0, 2)
-    dashboard.addWidgets(alarmsWidget)
 
     const cpuUsageGraphWidget = new GraphWidget({
       left: [
@@ -155,45 +183,42 @@ export class SreMonitoringEnvStack extends cdk.NestedStack {
         })
       ],
       stacked: false,
-      height: 6,
-      width: 6
+      height: 5,
+      width: 10
     })
-    cpuUsageGraphWidget.position(0, 4)
 
-    const errorsCountGraphWidget = new GraphWidget({
+    const errorsApplicationCountGraphWidget = new GraphWidget({
       left: [
         this.metricBrowserErrors
       ],
-      right: [
-        this.metricOracleErrors
-      ],
+      title: "Application Errors Count",
       period: Duration.seconds(300),
       statistic: Stats.SUM,
       stacked: false,
-      height: 6,
-      width: 6
+      height: 5,
+      width: 10
     })
-    errorsCountGraphWidget.position(6, 4)
-    dashboard.addWidgets(cpuUsageGraphWidget, errorsCountGraphWidget)
 
-    const logsQueryWidget = new LogQueryWidget({
-      title: 'Consolidated log',
-      logGroupNames: [
-          `${this.logGroupBrowser.logGroup.logGroupName}`,
-          `${this.logGroupBrowserScheduler.logGroup.logGroupName}`,
-          `${this.logGroupOracleAlert.logGroup.logGroupName}`
+    const errorsDBCountGraphWidget = new GraphWidget({
+      left: [
+        this.metricOracleErrors
       ],
-      queryLines: [
-        'fields @timestamp, @message, @logStream, @ingestionTime',
-        'sort @timestamp desc',
-        'limit 500',
-      ],
-      view: LogQueryVisualizationType.TABLE,
-      height: 6,
-      width: 24
+      title: "DB Errors Count",
+      period: Duration.seconds(300),
+      statistic: Stats.SUM,
+      stacked: false,
+      height: 5,
+      width: 10
     })
-    logsQueryWidget.position(0, 10)
-    dashboard.addWidgets(logsQueryWidget)
+    
+    const datasourcesCompleteTimeWidget = new SingleValueWidget({
+      metrics: [
+        this.metricDatasourcesComplete
+      ],
+      title: `Datasources Complete Time: latest`,
+      height: 3,
+      width: 5
+    })
 
     const logsDatasourceCompleteWidget = new LogQueryWidget({
       title: 'Datasources complete timings',
@@ -209,11 +234,9 @@ export class SreMonitoringEnvStack extends cdk.NestedStack {
         'display @timestamp, @message, CompleteTime/1000/60 as CompleteTimeMinutes'
       ],
       view: LogQueryVisualizationType.TABLE,
-      height: 6,
-      width: 24
+      height: 4,
+      width: 20
     })
-    logsDatasourceCompleteWidget.position(0, 16)
-    dashboard.addWidgets(logsDatasourceCompleteWidget)
 
     const logsDatasourceUpdatingWidget = new LogQueryWidget({
       title: 'Datasources updating timings',
@@ -227,13 +250,54 @@ export class SreMonitoringEnvStack extends cdk.NestedStack {
         'limit 100',
       ],
       view: LogQueryVisualizationType.TABLE,
-      height: 6,
-      width: 24
+      height: 4,
+      width: 20
     })
-    logsDatasourceUpdatingWidget.position(0, 22)
-    dashboard.addWidgets(logsDatasourceUpdatingWidget)
-  }
 
+    const logsConsolidatedQueryWidget = new LogQueryWidget({
+      title: 'Consolidated log',
+      logGroupNames: [
+          `${this.logGroupBrowser.logGroup.logGroupName}`,
+          `${this.logGroupBrowserScheduler.logGroup.logGroupName}`,
+          `${this.logGroupOracleAlert.logGroup.logGroupName}`
+      ],
+      queryLines: [
+        'fields @timestamp, @message, @logStream, @ingestionTime',
+        'sort @timestamp desc',
+        'limit 500',
+      ],
+      view: LogQueryVisualizationType.TABLE,
+      height: 8,
+      width: 20
+    })
+
+    //layout
+    generalWidget.position(0, 0)
+    alarmsWidget.position(10, 0)
+
+    errorsApplicationCountGraphWidget.position(0, 3)
+    errorsDBCountGraphWidget.position(0, 8)
+
+    cpuUsageGraphWidget.position(10, 3)
+
+    datasourcesCompleteTimeWidget.position(10, 8)
+
+    logsDatasourceCompleteWidget.position(0, 13)    
+    logsDatasourceUpdatingWidget.position(0, 17)
+    logsConsolidatedQueryWidget.position(0, 21)
+
+    dashboard.addWidgets(
+      generalWidget,
+      alarmsWidget,
+      cpuUsageGraphWidget,
+      errorsApplicationCountGraphWidget,
+      errorsDBCountGraphWidget,
+      datasourcesCompleteTimeWidget,
+      logsDatasourceCompleteWidget,
+      logsDatasourceUpdatingWidget,
+      logsConsolidatedQueryWidget
+      )    
+  }
 
 
   private createBrowserErrorsAlarm(): Alarm {
@@ -245,7 +309,7 @@ export class SreMonitoringEnvStack extends cdk.NestedStack {
       datapointsToAlarm: 1,
       threshold: 1,
       comparisonOperator: ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-      treatMissingData: TreatMissingData.MISSING
+      treatMissingData: TreatMissingData.BREACHING
     });
   }
 
@@ -281,10 +345,22 @@ export class SreMonitoringEnvStack extends cdk.NestedStack {
     });
   }
 
+  private createDatasourcesCompleteAlarm(): Alarm {
+    return new Alarm(this, `${this.prefix}_${this.cfg.envName}_DatasourcesComplete_Alarm`, {
+      alarmName: `${this.prefix}_${this.cfg.envName} Datasources Complete Alarm`,
+      metric: this.metricDatasourcesComplete,
+      evaluationPeriods: 1,
+      datapointsToAlarm: 1,
+      threshold: 60*60,
+      comparisonOperator: ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      treatMissingData: TreatMissingData.NOT_BREACHING
+    });
+  }
+
   private createGeneralAlarm(alarms: IAlarmRule[]): CompositeAlarm {
     const alarmRule = AlarmRule.anyOf(...alarms)
     return new CompositeAlarm(this, `${this.prefix}_${this.cfg.envName}_General_Alarm`, {
-      compositeAlarmName: `${this.prefix}_${this.cfg.envName} General Alarm`,
+      compositeAlarmName: `${this.prefix}_${this.cfg.envName} General Health`,
       alarmRule
     })
   }
