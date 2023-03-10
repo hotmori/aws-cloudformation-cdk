@@ -5,7 +5,7 @@ import {SreMonitoringStackConfig} from "../configs/sre-monitoring-stack-config";
 import {SreMonitoringRole} from "../resources/sre-monitoring-role";
 import {SreEnvConfig} from "../configs/sre-env-config";
 import {SreMonitoringEnvStack} from "./sre-monitoring-env-stack";
-import instancesJson from "../../config_instances/instances.json"
+import instancesJson from "../../configs/environment_instances.json"
 import {SreMonitoringNotification} from "../resources/sre-monitoring-notification";
 import {SreAlarmActions} from "../resources/sre-alarm-actions";
 import {SreMonitoringLambdaDatasourcesComplete} from "../resources/sre-monitoring-lambda-ds-complete";
@@ -42,7 +42,8 @@ export class SreMonitoringParentStack extends cdk.Stack {
         return new SreMonitoringStackConfig(
             prefix,
             lambda,
-            alarmActions
+            alarmActions,
+            notification
         )
     }
 
@@ -51,25 +52,30 @@ export class SreMonitoringParentStack extends cdk.Stack {
         return instancesJson.region[this.region]
             .map((env: { env_name: string;
                          app_instance_id: string;
-                         db_instance_id: string; }) =>
+                         db_instance_id: string; 
+                         email_list:string[]}) =>
                        this.getEnvConfig(commonConfig,
                                          env.env_name,
                                          env.app_instance_id,
-                                         env.db_instance_id));
+                                         env.db_instance_id,
+                                         env.email_list));
     }
 
     private getEnvConfig(commonConfig: SreMonitoringStackConfig,
                          envName:string,
                          appInstanceId:string,
-                         dbInstanceId:string): SreEnvConfig {
+                         dbInstanceId:string,
+                         email_list:string[]): SreEnvConfig {
 
 
         return {
             appInstanceId: appInstanceId,
             dbInstanceId:dbInstanceId,
             envName: envName,
-            lambda:commonConfig.lambda,
-            alarmAction: commonConfig.alarmActions.dev
+            lambdaDSComplete:commonConfig.lambda,
+            alarmAction: commonConfig.alarmActions.dev,
+            notification: commonConfig.notification,
+            email_list: email_list    
         }
     }
 }

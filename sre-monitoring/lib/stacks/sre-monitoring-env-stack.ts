@@ -23,9 +23,10 @@ import {
 } from "aws-cdk-lib/aws-cloudwatch";
 
 import {LambdaDestination} from "aws-cdk-lib/aws-logs-destinations";
+import {Subscription, SubscriptionProtocol, Topic} from "aws-cdk-lib/aws-sns";
 import {FilterPattern, MetricFilter, SubscriptionFilter} from "aws-cdk-lib/aws-logs";
 import {IAlarmRule} from "aws-cdk-lib/aws-cloudwatch/lib/alarm-base";
-import {SreEnvConfig} from "../configs/sre-env-config";
+import { SreEnvConfig } from '../configs/sre-env-config';
 import {SreMonitoringLogGroup} from "../resources/sre-monitoring-log-group";
 
 export class SreMonitoringEnvStack extends cdk.NestedStack {
@@ -35,6 +36,7 @@ export class SreMonitoringEnvStack extends cdk.NestedStack {
   private ec2DBInstanceId: string;
   private prefix: string;
 
+  private notificationSubscriptions:Subscription[];
   private logGroupBrowser:SreMonitoringLogGroup;
   private logGroupBrowserScheduler:SreMonitoringLogGroup;
   private logGroupOracleAlert:SreMonitoringLogGroup;
@@ -52,9 +54,29 @@ export class SreMonitoringEnvStack extends cdk.NestedStack {
     this.ec2AppInstanceId = this.cfg.appInstanceId;
     this.ec2DBInstanceId = this.cfg.dbInstanceId;
     this.prefix = prefix;
+
+    this.createNotificationSubscriptions();
     this.createLogGroups();
     this.createDashboard();
   }
+
+  private createNotificationSubscriptions() {
+    
+    this.notificationSubscriptions = [];
+
+    for (let email of this.cfg.email_list) {
+
+      const subscription = new Subscription(this,
+                                            `${this.prefix}_${this.environment}_${email}_MonitoringSubscription`,
+                                            {topic:this.cfg.notification.topic,
+                                             protocol:SubscriptionProtocol.EMAIL,
+                                             endpoint:`${email}`}
+                                             );
+
+      this.notificationSubscriptions.push(subscription);
+    }
+  }
+
 
   private createLogGroups() {
 
@@ -70,7 +92,7 @@ export class SreMonitoringEnvStack extends cdk.NestedStack {
     this.logGroupOracleAlert = new SreMonitoringLogGroup(this,
                                                          this.prefix,
                                                          this.ec2DBInstanceId,
-                                              'oracle.alert' );
+                                                        'oracle.alert' );
 
     //Creating a metric filter for filtering errors
     const metricFilterBrowserFilter = new MetricFilter(this,
@@ -105,13 +127,15 @@ export class SreMonitoringEnvStack extends cdk.NestedStack {
 
     this.metricDatasourcesComplete =  new Metric({
         metricName: `${this.prefix}_${this.ec2AppInstanceId}_DatasourcesCompleteTime`,
-        namespace: `${this.prefix}_Metrics`,          
+        namespace: `${this.prefix}_Metrics`,
+        period: Duration.minutes(1),
+        statistic:"Average",
         unit:Unit.SECONDS
       });
 
     const subscriptionFilterName:string = `${this.prefix}_${this.ec2AppInstanceId}_DataSourceTimingsSubscriptionFilter`;
 
-    const fn = this.cfg.lambda.lambdaFunction;
+    const fn = this.cfg.lambdaDSComplete.lambdaFunction;
     const lambdaDestination = new LambdaDestination(fn);
     const subscriptionFilter = new SubscriptionFilter(this,
         subscriptionFilterName,
@@ -119,7 +143,6 @@ export class SreMonitoringEnvStack extends cdk.NestedStack {
                filterPattern:FilterPattern.anyTerm('Datasources - complete'),
                logGroup: this.logGroupBrowserScheduler.logGroup
         });
-
 
   };
 
@@ -352,6 +375,7 @@ export class SreMonitoringEnvStack extends cdk.NestedStack {
       evaluationPeriods: 1,
       datapointsToAlarm: 1,
       threshold: 60*60,
+
       comparisonOperator: ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
       treatMissingData: TreatMissingData.NOT_BREACHING
     });

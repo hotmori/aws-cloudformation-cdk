@@ -8,16 +8,11 @@ export class SreMonitoringNotification {
     readonly topic: Topic;
     public constructor(scope: Construct, public prefix:string) {
 
-        const topic = new Topic(scope, `${prefix}_MonitoringTopic`);
-        const subscription = new Subscription(scope,
-                                         `${prefix}_MonitoringSubscription`,
-                                         {topic,
-                                                protocol:SubscriptionProtocol.EMAIL,
-                                                endpoint:`test@dx.com`
-        });
-        const action = new SnsAction(topic);
+        const topic = new Topic(scope, `${prefix}_MonitoringTopic`,
+                                        {displayName:`${prefix}_MonitoringTopic`,
+                                        topicName: `${prefix}_MonitoringTopic`});
 
-        this.subscription = subscription;
+        const action = new SnsAction(topic);
         this.action = action;
         this.topic = topic;
     }

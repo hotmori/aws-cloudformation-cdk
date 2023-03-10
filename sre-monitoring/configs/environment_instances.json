@@ -4,17 +4,20 @@
 			[{
 				"env_name":"DI_Evotec_DEV",
                 "app_instance_id":"i-0149157d096ee3b5d",
-				"db_instance_id":"i-0149157d096ee3b5d"
+				"db_instance_id":"i-0149157d096ee3b5d",
+				"email_list":["dx1@dotmatics.com", "dx10@dotmatics.com"]
 			 },
 			{
 			   "env_name":"DI_Evotec_MERGER",
                "app_instance_id":"i-0d12f2ed200767e15",
-			   "db_instance_id":"i-0d12f2ed200767e15"
+			   "db_instance_id":"i-0d12f2ed200767e15",
+			   "email_list":["dx2@dotmatics.com"]
 			},
 			{
 			   "env_name":"DI_Evotec_TEST",
                "app_instance_id":"i-0dda71dda688fb7f9",
-			   "db_instance_id":"i-0dda71dda688fb7f9"
+			   "db_instance_id":"i-0dda71dda688fb7f9",
+			   "email_list":["dx10@dotmatics.com","dx3@dotmatics.com","dx30@dotmatics.com"]
 			}],
 		
 		"eu-central-1":[]
